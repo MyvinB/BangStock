@@ -1,36 +1,76 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BangStock Retail Control System
 
-## Getting Started
+A modern retail management system with POS, inventory tracking, and client-facing storefront.
 
-First, run the development server:
+## Tech Stack
+- **Frontend:** Next.js 15 + TypeScript + Tailwind CSS
+- **Backend:** Supabase (PostgreSQL + Storage + Auth)
+- **Deployment:** Vercel (Free tier)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Setup Instructions
+
+### 1. Create Supabase Project
+1. Go to [supabase.com](https://supabase.com) and create a free account
+2. Create a new project
+3. Copy your project URL and anon key from Settings → API
+
+### 2. Configure Environment Variables
+Edit `.env.local` and add your Supabase credentials:
+```
+NEXT_PUBLIC_SUPABASE_URL=your_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 3. Set Up Database
+1. Go to Supabase Dashboard → SQL Editor
+2. Copy contents of `supabase-schema.sql`
+3. Paste and run the SQL to create all tables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 4. Enable Storage
+1. Go to Storage in Supabase Dashboard
+2. Create a new bucket called `product-images`
+3. Make it public (for client-facing site)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 5. Run Development Server
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000)
 
-## Learn More
+### 6. Deploy to Vercel
+```bash
+npm install -g vercel
+vercel
+```
+Add environment variables in Vercel dashboard.
 
-To learn more about Next.js, take a look at the following resources:
+## Features
+- ✅ Product & Stock Management
+- ✅ POS System with payment modes
+- ✅ Customer data capture
+- ✅ Expense tracking
+- ✅ Cash reconciliation
+- ✅ Owner dashboard
+- ✅ Client-facing inventory (live stock)
+- ✅ Real-time sync
+- ✅ Role-based access
+- ✅ Audit trail
+- ✅ Auto stock deduction
+- ✅ Image storage
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Project Structure
+```
+bangstock-app/
+├── app/                    # Next.js app directory
+│   ├── (admin)/           # Admin/POS routes (protected)
+│   ├── (public)/          # Client-facing storefront
+│   └── api/               # API routes
+├── components/            # React components
+├── lib/                   # Utilities & Supabase client
+└── supabase-schema.sql   # Database schema
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Free Tier Limits
+- Supabase: 500 MB database, 1 GB storage, 50k MAU
+- Vercel: Unlimited deployments, 100 GB bandwidth
+- Perfect for single retail shop with moderate traffic
