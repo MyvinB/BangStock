@@ -8,6 +8,7 @@ CREATE TABLE products (
   selling_price DECIMAL(10,2) NOT NULL,
   stock_quantity INTEGER NOT NULL DEFAULT 0,
   image_url TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

@@ -8,6 +8,7 @@ type Product = {
   name: string
   selling_price: number
   stock_quantity: number
+  image_url: string | null
 }
 
 type CartItem = {
@@ -30,7 +31,8 @@ export default function POSPage() {
   async function fetchProducts() {
     const { data } = await supabase
       .from('products')
-      .select('id, name, selling_price, stock_quantity')
+      .select('id, name, selling_price, stock_quantity, image_url')
+      .eq('is_active', true)
       .gt('stock_quantity', 0)
     if (data) setProducts(data)
   }
@@ -74,16 +76,17 @@ export default function POSPage() {
       .from('customers')
       .select('id')
       .eq('phone', customerPhone)
-      .single()
+      .maybeSingle()
 
     if (existingCustomer) {
       customerId = existingCustomer.id
     } else {
-      const { data: newCustomer } = await supabase
+      const { data: newCustomer, error: customerError } = await supabase
         .from('customers')
         .insert([{ name: customerName || 'Guest', phone: customerPhone }])
         .select('id')
         .single()
+      if (customerError) return alert('Failed to create customer: ' + customerError.message)
       customerId = newCustomer?.id
     }
 
@@ -148,12 +151,19 @@ export default function POSPage() {
                   onClick={() => addToCart(product)}
                   className="w-full bg-white p-4 rounded-lg shadow text-left hover:shadow-md active:scale-95"
                 >
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h3 className="font-bold">{product.name}</h3>
-                      <p className="text-sm text-gray-600">Stock: {product.stock_quantity}</p>
+                  <div className="flex gap-3 items-center">
+                    {product.image_url ? (
+                      <img src={product.image_url} alt={product.name} className="w-12 h-12 object-cover rounded-lg flex-shrink-0" />
+                    ) : (
+                      <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0 text-xl">📦</div>
+                    )}
+                    <div className="flex-1 flex justify-between items-center">
+                      <div>
+                        <h3 className="font-bold">{product.name}</h3>
+                        <p className="text-sm text-gray-600">Stock: {product.stock_quantity}</p>
+                      </div>
+                      <p className="text-lg font-bold text-indigo-600">₹{product.selling_price}</p>
                     </div>
-                    <p className="text-lg font-bold text-indigo-600">₹{product.selling_price}</p>
                   </div>
                 </button>
               ))}

@@ -35,6 +35,7 @@ export default function ExpensesPage() {
       description,
       amount: parseFloat(amount),
       category: category || null,
+      date: new Date().toISOString().split('T')[0],
     }])
     if (!error) {
       setDescription(''); setAmount(''); setCategory('')
@@ -109,7 +110,19 @@ export default function ExpensesPage() {
                 {expense.category && <p className="text-sm text-gray-500">{expense.category}</p>}
                 <p className="text-sm text-gray-500">{new Date(expense.created_at).toLocaleDateString()}</p>
               </div>
-              <p className="text-lg font-bold text-red-600">₹{expense.amount.toFixed(2)}</p>
+              <div className="flex items-center gap-3">
+                <p className="text-lg font-bold text-red-600">₹{expense.amount.toFixed(2)}</p>
+                <button
+                  onClick={async () => {
+                    if (!confirm('Delete this expense?')) return
+                    await supabase.from('expenses').delete().eq('id', expense.id)
+                    fetchExpenses()
+                  }}
+                  className="text-red-600 active:scale-95"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
           ))}
         </div>
