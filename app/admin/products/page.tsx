@@ -44,8 +44,17 @@ export default function ProductsPage() {
   const printRef = useRef<HTMLDivElement>(null)
 
   const [formData, setFormData] = useState({
-    sku: '', name: '', category: '', cost_price: '', selling_price: '',
+    name: '', category: '', cost_price: '', selling_price: '',
   })
+
+  async function generateSku(category: string) {
+    const prefix = category ? category.substring(0, 3).toUpperCase().replace(/\s/g, '') : 'PRD'
+    const { count } = await supabase.from('products').select('*', { count: 'exact', head: true }).ilike('sku', `${prefix}-%`)
+    const next = String((count || 0) + 1).padStart(3, '0')
+    const sku = `${prefix}-${next}`
+    const { data: existing } = await supabase.from('products').select('id').eq('sku', sku).maybeSingle()
+    return existing ? `${prefix}-${Date.now().toString().slice(-4)}` : sku
+  }
   const [variants, setVariants] = useState<Variant[]>([{ size: 'M', color: 'Black', stock_quantity: 0, sku: '' }])
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
@@ -106,8 +115,9 @@ export default function ProductsPage() {
     }
 
     // Insert product
+    const sku = await generateSku(formData.category)
     const { data: product, error } = await supabase.from('products').insert([{
-      sku: formData.sku,
+      sku,
       name: formData.name,
       category: formData.category || null,
       cost_price: parseFloat(formData.cost_price),
@@ -136,7 +146,7 @@ export default function ProductsPage() {
     }
 
     setUploading(false)
-    setFormData({ sku: '', name: '', category: '', cost_price: '', selling_price: '' })
+    setFormData({ name: '', category: '', cost_price: '', selling_price: '' })
     setVariants([{ size: 'M', color: 'Black', stock_quantity: 0, sku: '' }])
     setImageFiles([])
     setImagePreviews([])
@@ -204,9 +214,6 @@ export default function ProductsPage() {
         {showForm && (
           <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md mb-6 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input type="text" placeholder="SKU *" required value={formData.sku}
-                onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                className="border-2 border-gray-300 rounded-lg px-4 py-3" />
               <input type="text" placeholder="Product Name *" required value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="border-2 border-gray-300 rounded-lg px-4 py-3" />
