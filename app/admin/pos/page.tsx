@@ -33,6 +33,7 @@ export default function POSPage() {
   const [variantPicker, setVariantPicker] = useState<Product | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const scannerRef = useRef<any>(null)
+  const processedRef = useRef(false)
 
   useEffect(() => { fetchProducts() }, [])
 
@@ -74,39 +75,42 @@ export default function POSPage() {
   const total = cart.reduce((sum, item) => sum + (item.product.selling_price * item.quantity), 0)
 
   async function startScan() {
+    processedRef.current = false
     setScanning(true)
-    const reader = new BrowserQRCodeReader()
-    scannerRef.current = reader
-    try {
-      await reader.decodeFromVideoDevice(undefined, videoRef.current!, async (result) => {
-        if (!result) return
-        const scannedSku = result.getText()
-        stopScan()
+    // Wait for video element to mount
+    setTimeout(async () => {
+      const reader = new BrowserQRCodeReader()
+      scannerRef.current = reader
+      try {
+        await reader.decodeFromVideoDevice(undefined, videoRef.current!, async (result) => {
+          if (!result || processedRef.current) return
+          processedRef.current = true
+          const scannedSku = result.getText()
+          stopScan()
 
-        // Find variant by SKU
-        const { data: variant } = await supabase
-          .from('product_variants')
-          .select('*, products(*)')
-          .eq('sku', scannedSku)
-          .maybeSingle()
-
-        if (variant) {
-          addToCart(variant.products as any, variant as any)
-        } else {
-          // Try matching product SKU directly
-          const { data: product } = await supabase
-            .from('products')
-            .select('*, product_variants(*)')
+          const { data: variant } = await supabase
+            .from('product_variants')
+            .select('*, products(*)')
             .eq('sku', scannedSku)
             .maybeSingle()
-          if (product) handleProductClick(product as any)
-          else alert('Product not found for SKU: ' + scannedSku)
-        }
-      })
-    } catch (err) {
-      alert('Camera error. Please allow camera access.')
-      setScanning(false)
-    }
+
+          if (variant) {
+            addToCart(variant.products as any, variant as any)
+          } else {
+            const { data: product } = await supabase
+              .from('products')
+              .select('*, product_variants(*)')
+              .eq('sku', scannedSku)
+              .maybeSingle()
+            if (product) handleProductClick(product as any)
+            else alert('Product not found for SKU: ' + scannedSku)
+          }
+        })
+      } catch (err) {
+        alert('Camera error. Please allow camera access.')
+        setScanning(false)
+      }
+    }, 100)
   }
 
   function stopScan() {
