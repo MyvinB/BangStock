@@ -1,7 +1,21 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { QRCodeCanvas } from 'qrcode.react'
+
+const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size']
+const COLORS = ['Black', 'White', 'Red', 'Blue', 'Green', 'Yellow', 'Pink', 'Grey', 'Brown', 'Navy', 'Orange', 'Purple']
+
+type Variant = {
+  id?: string
+  size: string
+  color: string
+  stock_quantity: number
+  sku: string
+}
+
+type ProductImage = { id?: string; url: string }
 
 type Product = {
   id: string
@@ -12,85 +26,161 @@ type Product = {
   selling_price: number
   stock_quantity: number
   image_url: string | null
+  product_variants: Variant[]
+  product_images: ProductImage[]
+}
+
+function generateVariantSku(baseSku: string, color: string, size: string) {
+  return `${baseSku}-${color.substring(0, 3).toUpperCase()}-${size}`.replace(/\s/g, '')
 }
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [showForm, setShowForm] = useState(false)
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [printVariant, setPrintVariant] = useState<{ sku: string; name: string } | null>(null)
   const [editingStock, setEditingStock] = useState<{ id: string; value: string } | null>(null)
+  const printRef = useRef<HTMLDivElement>(null)
+
   const [formData, setFormData] = useState({
-    sku: '', name: '', category: '', cost_price: '', selling_price: '', stock_quantity: '',
+    sku: '', name: '', category: '', cost_price: '', selling_price: '',
   })
+  const [variants, setVariants] = useState<Variant[]>([{ size: 'M', color: 'Black', stock_quantity: 0, sku: '' }])
+  const [imageFiles, setImageFiles] = useState<File[]>([])
+  const [imagePreviews, setImagePreviews] = useState<string[]>([])
 
   useEffect(() => { fetchProducts() }, [])
 
   async function fetchProducts() {
-    const { data } = await supabase.from('products').select('*').eq('is_active', true).order('created_at', { ascending: false })
-    if (data) setProducts(data)
+    const { data } = await supabase
+      .from('products')
+      .select('*, product_variants(*), product_images(*)')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+    if (data) setProducts(data as any)
   }
 
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setImageFile(file)
-    setImagePreview(URL.createObjectURL(file))
+  function handleImageFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || [])
+    setImageFiles(prev => [...prev, ...files])
+    setImagePreviews(prev => [...prev, ...files.map(f => URL.createObjectURL(f))])
   }
 
   async function uploadImage(file: File): Promise<string | null> {
     const ext = file.name.split('.').pop()
-    const path = `${Date.now()}.${ext}`
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
     const { error } = await supabase.storage.from('product-images').upload(path, file)
     if (error) { alert('Upload failed: ' + error.message); return null }
-    const { data } = supabase.storage.from('product-images').getPublicUrl(path)
-    return data.publicUrl
+    return supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl
+  }
+
+  function updateVariant(index: number, field: keyof Variant, value: string | number) {
+    setVariants(prev => {
+      const updated = [...prev]
+      updated[index] = { ...updated[index], [field]: value }
+      if (field === 'size' || field === 'color') {
+        updated[index].sku = generateVariantSku(formData.sku || 'SKU', updated[index].color, updated[index].size)
+      }
+      return updated
+    })
+  }
+
+  function addVariant() {
+    setVariants(prev => [...prev, { size: 'M', color: 'Black', stock_quantity: 0, sku: '' }])
+  }
+
+  function removeVariant(index: number) {
+    setVariants(prev => prev.filter((_, i) => i !== index))
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setUploading(true)
 
-    let image_url = null
-    if (imageFile) image_url = await uploadImage(imageFile)
+    // Upload images
+    const uploadedUrls: string[] = []
+    for (const file of imageFiles) {
+      const url = await uploadImage(file)
+      if (url) uploadedUrls.push(url)
+    }
 
-    const { error } = await supabase.from('products').insert([{
+    // Insert product
+    const { data: product, error } = await supabase.from('products').insert([{
       sku: formData.sku,
       name: formData.name,
       category: formData.category || null,
       cost_price: parseFloat(formData.cost_price),
       selling_price: parseFloat(formData.selling_price),
-      stock_quantity: parseInt(formData.stock_quantity),
-      image_url,
-    }])
+      stock_quantity: variants.reduce((s, v) => s + v.stock_quantity, 0),
+      image_url: uploadedUrls[0] || null,
+    }]).select('id').single()
+
+    if (error) { alert(error.message); setUploading(false); return }
+
+    // Insert variants
+    if (variants.length > 0) {
+      const variantRows = variants.map(v => ({
+        product_id: product.id,
+        sku: generateVariantSku(formData.sku, v.color, v.size),
+        size: v.size,
+        color: v.color,
+        stock_quantity: v.stock_quantity,
+      }))
+      await supabase.from('product_variants').insert(variantRows)
+    }
+
+    // Insert images
+    if (uploadedUrls.length > 0) {
+      await supabase.from('product_images').insert(uploadedUrls.map(url => ({ product_id: product.id, url })))
+    }
 
     setUploading(false)
-    if (!error) {
-      setFormData({ sku: '', name: '', category: '', cost_price: '', selling_price: '', stock_quantity: '' })
-      setImageFile(null)
-      setImagePreview(null)
-      setShowForm(false)
-      fetchProducts()
-    }
-  }
-
-  async function saveStock(id: string, value: string) {
-    const qty = parseInt(value)
-    if (isNaN(qty) || qty < 0) return
-    await supabase.from('products').update({ stock_quantity: qty }).eq('id', id)
-    setEditingStock(null)
+    setFormData({ sku: '', name: '', category: '', cost_price: '', selling_price: '' })
+    setVariants([{ size: 'M', color: 'Black', stock_quantity: 0, sku: '' }])
+    setImageFiles([])
+    setImagePreviews([])
+    setShowForm(false)
     fetchProducts()
   }
 
   async function deleteProduct(id: string) {
     if (!confirm('Delete this product?')) return
     const { error } = await supabase.from('products').delete().eq('id', id)
-    if (error?.code === '23503') {
-      // Has sales history — soft delete instead
-      await supabase.from('products').update({ is_active: false }).eq('id', id)
-    }
+    if (error?.code === '23503') await supabase.from('products').update({ is_active: false }).eq('id', id)
     fetchProducts()
+  }
+
+  async function saveVariantStock(variantId: string, value: string) {
+    const qty = parseInt(value)
+    if (isNaN(qty) || qty < 0) return
+    await supabase.from('product_variants').update({ stock_quantity: qty }).eq('id', variantId)
+    setEditingStock(null)
+    fetchProducts()
+  }
+
+  function printQR() {
+    const canvas = printRef.current?.querySelector('canvas')
+    if (!canvas) return
+    const imgData = canvas.toDataURL('image/png')
+    const win = window.open('', '_blank')
+    win?.document.write(`
+      <html><head><title>Print QR</title>
+      <style>
+        body { display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif; }
+        .label { text-align:center; padding:12px; border:1px solid #ccc; border-radius:8px; }
+        p { margin:4px 0; font-size:12px; }
+      </style></head>
+      <body>
+        <div class="label">
+          <img src="${imgData}" width="160" height="160" />
+          <p><strong>${printVariant?.name}</strong></p>
+          <p style="color:#666">${printVariant?.sku}</p>
+        </div>
+        <script>window.onload=()=>window.print()<\/script>
+      </body></html>
+    `)
+    win?.document.close()
   }
 
   return (
@@ -101,113 +191,215 @@ export default function ProductsPage() {
             <a href="/admin" className="text-sm opacity-75 hover:opacity-100">← Back</a>
             <h1 className="text-2xl font-bold">Products</h1>
           </div>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-medium active:scale-95"
-          >
+          <button onClick={() => setShowForm(!showForm)}
+            className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-medium active:scale-95">
             {showForm ? 'Cancel' : '+ Add Product'}
           </button>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-6">
+
+        {/* Add Product Form */}
         {showForm && (
-          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md mb-6">
+          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md mb-6 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <input type="text" placeholder="SKU *" required value={formData.sku}
                 onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                className="border rounded-lg px-4 py-3 text-lg" />
+                className="border-2 border-gray-300 rounded-lg px-4 py-3" />
               <input type="text" placeholder="Product Name *" required value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="border rounded-lg px-4 py-3 text-lg" />
+                className="border-2 border-gray-300 rounded-lg px-4 py-3" />
               <input type="text" placeholder="Category" value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="border rounded-lg px-4 py-3 text-lg" />
+                className="border-2 border-gray-300 rounded-lg px-4 py-3" />
               <input type="number" placeholder="Cost Price *" required step="0.01" value={formData.cost_price}
                 onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
-                className="border rounded-lg px-4 py-3 text-lg" />
+                className="border-2 border-gray-300 rounded-lg px-4 py-3" />
               <input type="number" placeholder="Selling Price *" required step="0.01" value={formData.selling_price}
                 onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
-                className="border rounded-lg px-4 py-3 text-lg" />
-              <input type="number" placeholder="Stock Quantity *" required value={formData.stock_quantity}
-                onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
-                className="border rounded-lg px-4 py-3 text-lg" />
+                className="border-2 border-gray-300 rounded-lg px-4 py-3" />
             </div>
 
-            {/* Image Upload */}
-            <div className="mt-4">
-              <label className="block text-base font-semibold text-gray-900 mb-2">Product Image</label>
-              <input type="file" accept="image/*" onChange={handleImageChange}
-                className="w-full border rounded-lg px-4 py-3" />
-              {imagePreview && (
-                <img src={imagePreview} alt="Preview" className="mt-3 h-32 w-32 object-cover rounded-lg border" />
+            {/* Images */}
+            <div>
+              <label className="block text-base font-semibold text-gray-900 mb-2">Photos</label>
+              <input type="file" accept="image/*" multiple onChange={handleImageFiles}
+                className="w-full border-2 border-gray-300 rounded-lg px-4 py-3" />
+              {imagePreviews.length > 0 && (
+                <div className="flex gap-2 mt-3 flex-wrap">
+                  {imagePreviews.map((src, i) => (
+                    <div key={i} className="relative">
+                      <img src={src} className="h-20 w-20 object-cover rounded-lg border" />
+                      <button type="button" onClick={() => {
+                        setImagePreviews(p => p.filter((_, j) => j !== i))
+                        setImageFiles(p => p.filter((_, j) => j !== i))
+                      }} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">✕</button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
+            {/* Variants */}
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-base font-semibold text-gray-900">Size & Color Variants</label>
+                <button type="button" onClick={addVariant}
+                  className="text-sm text-indigo-600 font-medium">+ Add Variant</button>
+              </div>
+              <div className="space-y-2">
+                {variants.map((v, i) => (
+                  <div key={i} className="grid grid-cols-4 gap-2 items-center">
+                    <select value={v.size} onChange={(e) => updateVariant(i, 'size', e.target.value)}
+                      className="border-2 border-gray-300 rounded-lg px-3 py-2 text-sm">
+                      {SIZES.map(s => <option key={s}>{s}</option>)}
+                    </select>
+                    <select value={v.color} onChange={(e) => updateVariant(i, 'color', e.target.value)}
+                      className="border-2 border-gray-300 rounded-lg px-3 py-2 text-sm">
+                      {COLORS.map(c => <option key={c}>{c}</option>)}
+                    </select>
+                    <input type="number" placeholder="Stock" min="0" value={v.stock_quantity === 0 ? '' : v.stock_quantity}
+                      onChange={(e) => updateVariant(i, 'stock_quantity', e.target.value === '' ? 0 : parseInt(e.target.value))}
+                      className="border-2 border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                    <button type="button" onClick={() => removeVariant(i)}
+                      className="text-red-500 text-sm">Remove</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <button type="submit" disabled={uploading}
-              className="mt-4 w-full bg-indigo-600 text-white py-3 rounded-lg font-medium active:scale-95 disabled:opacity-50">
-              {uploading ? 'Uploading...' : 'Add Product'}
+              className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium active:scale-95 disabled:opacity-50">
+              {uploading ? 'Saving...' : 'Add Product'}
             </button>
           </form>
         )}
 
+        {/* Product List */}
         <div className="space-y-3">
           {products.map((product) => (
-            <div key={product.id} className="bg-white p-4 rounded-lg shadow flex gap-4 items-center">
-              <label className="cursor-pointer flex-shrink-0 relative group">
-                {product.image_url ? (
-                  <img src={product.image_url} alt={product.name} className="w-16 h-16 object-cover rounded-lg" />
-                ) : (
-                  <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-2xl">📦</div>
-                )}
-                <div className="absolute inset-0 bg-black bg-opacity-40 rounded-lg opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-medium">
-                  Upload
-                </div>
-                <input type="file" accept="image/*" className="hidden"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0]
-                    if (!file) return
-                    const url = await uploadImage(file)
-                    if (!url) return
-                    const { error } = await supabase.from('products').update({ image_url: url }).eq('id', product.id)
-                    if (error) { alert('Save failed: ' + error.message); return }
-                    fetchProducts()
-                  }}
-                />
-              </label>
-              <div className="flex-1">
-                <h3 className="font-bold text-lg">{product.name}</h3>
-                <p className="text-sm text-gray-600">SKU: {product.sku}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-sm text-gray-600">Stock:</span>
-                  {editingStock?.id === product.id ? (
-                    <input
-                      type="number"
-                      autoFocus
-                      value={editingStock.value}
-                      onChange={(e) => setEditingStock({ id: product.id, value: e.target.value })}
-                      onBlur={() => saveStock(product.id, editingStock.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && saveStock(product.id, editingStock.value)}
-                      className="w-20 border-2 border-indigo-400 rounded px-2 py-0.5 text-sm"
-                    />
+            <div key={product.id} className="bg-white rounded-lg shadow overflow-hidden">
+              {/* Product Row */}
+              <div className="p-4 flex gap-4 items-center">
+                {/* Image */}
+                <label className="cursor-pointer flex-shrink-0 relative group">
+                  {product.image_url ? (
+                    <img src={product.image_url} alt={product.name} className="w-16 h-16 object-cover rounded-lg" />
                   ) : (
-                    <button
-                      onClick={() => setEditingStock({ id: product.id, value: String(product.stock_quantity) })}
-                      className="text-sm font-medium text-indigo-600 underline underline-offset-2"
-                    >
-                      {product.stock_quantity}
-                    </button>
+                    <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">📦</div>
+                  )}
+                  <div className="absolute inset-0 bg-black bg-opacity-40 rounded-lg opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-medium">Upload</div>
+                  <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                    const file = e.target.files?.[0]; if (!file) return
+                    const url = await uploadImage(file); if (!url) return
+                    await supabase.from('products').update({ image_url: url }).eq('id', product.id)
+                    fetchProducts()
+                  }} />
+                </label>
+
+                <div className="flex-1">
+                  <h3 className="font-bold text-lg text-gray-900">{product.name}</h3>
+                  <p className="text-sm text-gray-500">SKU: {product.sku} {product.category && `| ${product.category}`}</p>
+                  <p className="text-sm text-gray-500">Cost: ₹{product.cost_price} | Sell: ₹{product.selling_price}</p>
+                  {product.product_variants?.length > 0 && (
+                    <p className="text-xs text-indigo-600 mt-1">{product.product_variants.length} variants</p>
                   )}
                 </div>
-                <p className="text-sm text-gray-600">Cost: ₹{product.cost_price} | Sell: ₹{product.selling_price}</p>
+
+                <div className="flex flex-col gap-2 items-end">
+                  <button onClick={() => deleteProduct(product.id)} className="text-red-500 text-sm">Delete</button>
+                  <button onClick={() => setExpandedId(expandedId === product.id ? null : product.id)}
+                    className="text-indigo-600 text-sm">
+                    {expandedId === product.id ? 'Hide ▲' : 'Variants ▼'}
+                  </button>
+                </div>
               </div>
-              <button onClick={() => deleteProduct(product.id)} className="text-red-600 px-4 py-2 active:scale-95">
-                Delete
-              </button>
+
+              {/* Variants Panel */}
+              {expandedId === product.id && (
+                <div className="border-t px-4 py-3 bg-gray-50">
+                  {/* Extra images */}
+                  {product.product_images?.length > 0 && (
+                    <div className="flex gap-2 mb-3 flex-wrap">
+                      {product.product_images.map(img => (
+                        <img key={img.id} src={img.url} className="h-14 w-14 object-cover rounded-lg border" />
+                      ))}
+                      <label className="h-14 w-14 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer text-gray-400 text-xl hover:border-indigo-400">
+                        +
+                        <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                          const file = e.target.files?.[0]; if (!file) return
+                          const url = await uploadImage(file); if (!url) return
+                          await supabase.from('product_images').insert([{ product_id: product.id, url }])
+                          fetchProducts()
+                        }} />
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Variants table */}
+                  {product.product_variants?.length > 0 ? (
+                    <div className="space-y-2">
+                      {product.product_variants.map((v) => (
+                        <div key={v.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border">
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-medium text-gray-900">{v.color} / {v.size}</span>
+                            <span className="text-xs text-gray-400">{v.sku}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {editingStock?.id === v.id ? (
+                              <input type="number" autoFocus value={editingStock.value}
+                                onChange={(e) => setEditingStock({ id: v.id!, value: e.target.value })}
+                                onBlur={() => saveVariantStock(v.id!, editingStock.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && saveVariantStock(v.id!, editingStock.value)}
+                                className="w-16 border-2 border-indigo-400 rounded px-2 py-0.5 text-sm" />
+                            ) : (
+                              <button onClick={() => setEditingStock({ id: v.id!, value: String(v.stock_quantity) })}
+                                className="text-sm font-medium text-indigo-600 underline underline-offset-2">
+                                {v.stock_quantity} in stock
+                              </button>
+                            )}
+                            <button onClick={() => setPrintVariant({ sku: v.sku, name: `${product.name} ${v.color} ${v.size}` })}
+                              className="text-xs bg-indigo-600 text-white px-2 py-1 rounded active:scale-95">
+                              🖨 Print QR
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400">No variants added</p>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
       </main>
+
+      {/* Print QR Modal */}
+      {printVariant && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 text-center space-y-4 w-72">
+            <h3 className="font-bold text-gray-900">{printVariant.name}</h3>
+            <div ref={printRef} className="label flex flex-col items-center gap-2">
+              <QRCodeCanvas value={printVariant.sku} size={160} />
+              <p style={{margin:'4px 0', fontSize:'12px', fontWeight:'bold'}}>{printVariant.name}</p>
+              <p style={{margin:'4px 0', fontSize:'11px', color:'#666'}}>{printVariant.sku}</p>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={printQR}
+                className="flex-1 bg-indigo-600 text-white py-2 rounded-lg font-medium active:scale-95">
+                Print
+              </button>
+              <button onClick={() => setPrintVariant(null)}
+                className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg font-medium active:scale-95">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

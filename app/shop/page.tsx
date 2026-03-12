@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
+type Variant = { size: string; color: string; stock_quantity: number }
+type ProductImage = { url: string }
+
 type Product = {
   id: string
   name: string
@@ -10,78 +13,153 @@ type Product = {
   stock_quantity: number
   image_url: string | null
   category: string | null
+  product_variants: Variant[]
+  product_images: ProductImage[]
 }
 
 export default function ShopPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [category, setCategory] = useState('All')
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchProducts()
-  }, [])
+  useEffect(() => { fetchProducts() }, [])
 
   async function fetchProducts() {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('products')
-      .select('*')
+      .select('*, product_variants(*), product_images(*)')
+      .eq('is_active', true)
       .gt('stock_quantity', 0)
       .order('created_at', { ascending: false })
-
-    if (!error && data) {
-      setProducts(data)
-    }
+    if (data) setProducts(data as any)
     setLoading(false)
   }
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
-  }
+  const categories = ['All', ...Array.from(new Set(products.map(p => p.category).filter(Boolean) as string[]))]
+  const filtered = category === 'All' ? products : products.filter(p => p.category === category)
+
+  const availableSizes = (p: Product) => [...new Set(p.product_variants.filter(v => v.stock_quantity > 0).map(v => v.size))]
+  const availableColors = (p: Product) => [...new Set(p.product_variants.filter(v => v.stock_quantity > 0).map(v => v.color))]
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-500">Loading...</div>
 
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-6">
-          <h1 className="text-3xl font-bold text-gray-900">BangStock Shop</h1>
-          <p className="text-gray-600">Live Inventory</p>
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">BangStock</h1>
+            <p className="text-sm text-gray-500">Live Inventory</p>
+          </div>
         </div>
+        {/* Category Filter */}
+        {categories.length > 1 && (
+          <div className="container mx-auto px-4 pb-3 flex gap-2 overflow-x-auto">
+            {categories.map(c => (
+              <button key={c} onClick={() => setCategory(c)}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap ${category === c ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                {c}
+              </button>
+            ))}
+          </div>
+        )}
       </header>
 
-      <main className="container mx-auto px-4 py-8">
-        {products.length === 0 ? (
-          <div className="text-center py-16">
-            <p className="text-gray-500 text-lg mb-4">No products available</p>
-            <p className="text-sm text-gray-400">Add products via Admin panel</p>
-          </div>
+      <main className="container mx-auto px-4 py-6">
+        {filtered.length === 0 ? (
+          <div className="text-center py-16 text-gray-500">No products available</div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {products.map((product) => (
-              <div key={product.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
-                <div className="aspect-square bg-gray-200 flex items-center justify-center">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {filtered.map((product) => (
+              <div key={product.id} onClick={() => { setSelectedProduct(product); setSelectedImage(product.image_url) }}
+                className="bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow active:scale-95">
+                <div className="aspect-square bg-gray-100">
                   {product.image_url ? (
                     <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-gray-400">No image</span>
+                    <div className="w-full h-full flex items-center justify-center text-4xl">📦</div>
                   )}
                 </div>
-                <div className="p-4">
-                  <h3 className="font-semibold text-gray-900 mb-1">{product.name}</h3>
-                  {product.category && (
-                    <p className="text-sm text-gray-500 mb-2">{product.category}</p>
+                <div className="p-3">
+                  <h3 className="font-semibold text-gray-900 text-sm leading-tight">{product.name}</h3>
+                  {product.category && <p className="text-xs text-gray-400 mt-0.5">{product.category}</p>}
+                  <p className="text-base font-bold text-indigo-600 mt-1">₹{product.selling_price}</p>
+                  {availableSizes(product).length > 0 && (
+                    <div className="flex gap-1 mt-1 flex-wrap">
+                      {availableSizes(product).map(s => (
+                        <span key={s} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{s}</span>
+                      ))}
+                    </div>
                   )}
-                  <p className="text-lg font-bold text-indigo-600">₹{product.selling_price}</p>
-                  <p className="text-sm text-gray-500 mt-1">{product.stock_quantity} in stock</p>
-                  <button
-                    onClick={() => window.open(`https://wa.me/YOUR_PHONE?text=I'm interested in ${product.name}`, '_blank')}
-                    className="mt-3 w-full bg-green-500 text-white py-3 rounded-lg hover:bg-green-600 transition-colors font-medium active:scale-95 touch-manipulation"
-                  >
-                    Inquire on WhatsApp
-                  </button>
                 </div>
               </div>
             ))}
           </div>
         )}
       </main>
+
+      {/* Product Detail Modal */}
+      {selectedProduct && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+            {/* Images */}
+            <div className="aspect-square bg-gray-100 relative">
+              <img src={selectedImage || selectedProduct.image_url || ''} alt={selectedProduct.name}
+                className="w-full h-full object-cover" />
+              <button onClick={() => setSelectedProduct(null)}
+                className="absolute top-3 right-3 bg-white rounded-full w-8 h-8 flex items-center justify-center shadow text-gray-600">✕</button>
+            </div>
+
+            {/* Thumbnail strip */}
+            {selectedProduct.product_images?.length > 1 && (
+              <div className="flex gap-2 px-4 py-2 overflow-x-auto">
+                {selectedProduct.product_images.map((img, i) => (
+                  <img key={i} src={img.url} onClick={() => setSelectedImage(img.url)}
+                    className={`h-14 w-14 object-cover rounded-lg cursor-pointer flex-shrink-0 border-2 ${selectedImage === img.url ? 'border-indigo-500' : 'border-transparent'}`} />
+                ))}
+              </div>
+            )}
+
+            <div className="p-4">
+              <h2 className="text-xl font-bold text-gray-900">{selectedProduct.name}</h2>
+              {selectedProduct.category && <p className="text-sm text-gray-500">{selectedProduct.category}</p>}
+              <p className="text-2xl font-bold text-indigo-600 mt-2">₹{selectedProduct.selling_price}</p>
+
+              {/* Colors */}
+              {availableColors(selectedProduct).length > 0 && (
+                <div className="mt-3">
+                  <p className="text-sm font-semibold text-gray-700 mb-1">Colors</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {availableColors(selectedProduct).map(c => (
+                      <span key={c} className="px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700">{c}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Sizes */}
+              {availableSizes(selectedProduct).length > 0 && (
+                <div className="mt-3">
+                  <p className="text-sm font-semibold text-gray-700 mb-1">Available Sizes</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {availableSizes(selectedProduct).map(s => (
+                      <span key={s} className="px-3 py-1 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700">{s}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <a href={`https://wa.me/918971170118?text=Hi! I'm interested in ${encodeURIComponent(selectedProduct.name)}`}
+                target="_blank" rel="noopener noreferrer"
+                className="mt-4 w-full bg-green-500 text-white py-3 rounded-xl font-medium text-center block active:scale-95">
+                💬 Inquire on WhatsApp
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -17,9 +17,18 @@ CREATE TABLE products (
 CREATE TABLE product_variants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+  sku TEXT UNIQUE NOT NULL,
   size TEXT,
   color TEXT,
   stock_quantity INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Product Images (multiple per product)
+CREATE TABLE product_images (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+  url TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
