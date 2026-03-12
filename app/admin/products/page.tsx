@@ -132,7 +132,7 @@ export default function ProductsPage() {
     if (variants.length > 0) {
       const variantRows = variants.map(v => ({
         product_id: product.id,
-        sku: generateVariantSku(formData.sku, v.color, v.size),
+        sku: generateVariantSku(sku, v.color, v.size),
         size: v.size,
         color: v.color,
         stock_quantity: v.stock_quantity,
