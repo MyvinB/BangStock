@@ -83,7 +83,7 @@ export default function POSPage() {
       scannerRef.current = reader
       try {
         await reader.decodeFromVideoDevice(undefined, videoRef.current!, async (result) => {
-          if (!result || processedRef.current) return
+          if (!result || processedRef.current || scannerRef.current !== reader) return
           processedRef.current = true
           const scannedSku = result.getText()
           stopScan()
@@ -114,7 +114,8 @@ export default function POSPage() {
   }
 
   function stopScan() {
-    scannerRef.current?.reset?.()
+    try { scannerRef.current?.reset?.() } catch {}
+    scannerRef.current = null
     setScanning(false)
   }
 
