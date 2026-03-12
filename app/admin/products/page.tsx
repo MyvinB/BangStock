@@ -355,10 +355,10 @@ export default function ProductsPage() {
                           </div>
                           <div className="flex items-center gap-3">
                             {editingStock?.id === v.id ? (
-                              <input type="number" autoFocus value={editingStock.value}
+                              <input type="number" autoFocus value={editingStock!.value}
                                 onChange={(e) => setEditingStock({ id: v.id!, value: e.target.value })}
-                                onBlur={() => saveVariantStock(v.id!, editingStock.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && saveVariantStock(v.id!, editingStock.value)}
+                                onBlur={() => saveVariantStock(v.id!, editingStock!.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && saveVariantStock(v.id!, editingStock!.value)}
                                 className="w-16 border-2 border-indigo-400 rounded px-2 py-0.5 text-sm" />
                             ) : (
                               <button onClick={() => setEditingStock({ id: v.id!, value: String(v.stock_quantity) })}
