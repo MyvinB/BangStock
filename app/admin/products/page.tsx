@@ -30,8 +30,8 @@ type Product = {
   product_images: ProductImage[]
 }
 
-function generateVariantSku(baseSku: string, color: string, size: string) {
-  return `${baseSku}-${color.substring(0, 3).toUpperCase()}-${size}`.replace(/\s/g, '')
+function generateVariantSku(base: string, color: string, size: string) {
+  return `${base.substring(0, 3).toUpperCase().replace(/\s/g, '')}-${color.substring(0, 3).toUpperCase()}-${size}`.replace(/\s/g, '')
 }
 
 export default function ProductsPage() {
@@ -89,7 +89,7 @@ export default function ProductsPage() {
       const updated = [...prev]
       updated[index] = { ...updated[index], [field]: value }
       if (field === 'size' || field === 'color') {
-        updated[index].sku = generateVariantSku(formData.sku || 'SKU', updated[index].color, updated[index].size)
+        updated[index].sku = generateVariantSku(formData.name || 'PRD', updated[index].color, updated[index].size)
       }
       return updated
     })
