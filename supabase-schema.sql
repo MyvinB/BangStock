@@ -170,3 +170,40 @@ CREATE TRIGGER on_auth_user_created
 
 -- To make a user admin, run:
 -- UPDATE profiles SET role = 'admin' WHERE id = '<your-user-id>';
+
+-- Refunds Table
+CREATE TABLE refunds (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sale_id UUID REFERENCES sales(id),
+  sale_item_id UUID REFERENCES sale_items(id),
+  product_id UUID REFERENCES products(id),
+  variant_id UUID REFERENCES product_variants(id),
+  quantity INTEGER NOT NULL,
+  refund_amount DECIMAL(10,2) NOT NULL,
+  reason TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE refunds ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Authenticated users can manage refunds" ON refunds FOR ALL USING (auth.role() = 'authenticated');
+
+-- Function to auto-restore stock on refund
+CREATE OR REPLACE FUNCTION update_stock_on_refund()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.variant_id IS NOT NULL THEN
+    UPDATE product_variants
+    SET stock_quantity = stock_quantity + NEW.quantity
+    WHERE id = NEW.variant_id;
+  ELSE
+    UPDATE products
+    SET stock_quantity = stock_quantity + NEW.quantity
+    WHERE id = NEW.product_id;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_stock_on_refund
+AFTER INSERT ON refunds
+FOR EACH ROW EXECUTE FUNCTION update_stock_on_refund();

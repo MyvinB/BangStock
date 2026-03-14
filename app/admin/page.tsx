@@ -38,6 +38,11 @@ export default function AdminPage() {
             <p className="text-gray-600">Process sales and payments</p>
           </a>
 
+          <a href="/admin/refunds" className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow active:scale-95">
+            <h2 className="text-xl font-bold text-gray-900 mb-2">↩️ Refunds</h2>
+            <p className="text-gray-600">Process returns and refunds</p>
+          </a>
+
           <a href="/admin/products" className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow active:scale-95">
             <h2 className="text-xl font-bold text-gray-900 mb-2">📦 Products</h2>
             <p className="text-gray-600">Manage inventory and stock</p>

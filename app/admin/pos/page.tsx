@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth'
 import { BrowserQRCodeReader } from '@zxing/browser'
 
 type Variant = { id: string; size: string; color: string; stock_quantity: number; sku: string }
@@ -23,11 +24,20 @@ type CartItem = {
 }
 
 export default function POSPage() {
+  const { user } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [paymentMode, setPaymentMode] = useState<'Cash' | 'UPI' | 'Card'>('Cash')
+
+  async function onPhoneChange(phone: string) {
+    setCustomerPhone(phone)
+    if (phone.length >= 10) {
+      const { data } = await supabase.from('customers').select('name').eq('phone', phone).maybeSingle()
+      if (data) setCustomerName(data.name)
+    }
+  }
   const [search, setSearch] = useState('')
   const [scanning, setScanning] = useState(false)
   const [variantPicker, setVariantPicker] = useState<Product | null>(null)
@@ -135,7 +145,7 @@ export default function POSPage() {
     }
 
     const { data: sale } = await supabase
-      .from('sales').insert([{ customer_id: customerId, total_amount: total, payment_mode: paymentMode }]).select('id').single()
+      .from('sales').insert([{ customer_id: customerId, total_amount: total, payment_mode: paymentMode, staff_id: user?.id }]).select('id').single()
 
     if (sale) {
       await supabase.from('sale_items').insert(cart.map(item => ({
@@ -246,9 +256,12 @@ export default function POSPage() {
                 </div>
 
                 <div className="border-t pt-4 space-y-3">
-                  <input type="tel" placeholder="Customer Phone *" value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    className="w-full border-2 border-gray-300 rounded-lg px-4 py-3" />
+                  <div className="flex gap-2">
+                    <span className="border-2 border-gray-300 rounded-lg px-3 py-3 bg-gray-100 text-gray-600">+91</span>
+                    <input type="tel" placeholder="Customer Phone *" value={customerPhone}
+                      onChange={(e) => onPhoneChange(e.target.value)}
+                      className="flex-1 border-2 border-gray-300 rounded-lg px-4 py-3" />
+                  </div>
                   <input type="text" placeholder="Customer Name (optional)" value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
                     className="w-full border-2 border-gray-300 rounded-lg px-4 py-3" />

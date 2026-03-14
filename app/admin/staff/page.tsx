@@ -4,10 +4,12 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import AdminOnly from '@/components/AdminOnly'
 
-type StaffMember = { id: string; email: string; role: string }
+type MonthStats = { label: string; count: number; total: number }
+type StaffMember = { id: string; email: string; role: string; months: MonthStats[] }
 
 export default function StaffPage() {
   const [staff, setStaff] = useState<StaffMember[]>([])
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -23,7 +25,39 @@ export default function StaffPage() {
     const token = await getToken()
     const res = await fetch('/api/staff', { headers: { authorization: `Bearer ${token}` } })
     const data = await res.json()
-    setStaff(data)
+
+    const yearAgo = new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1).toISOString()
+    const { data: sales } = await supabase.from('sales').select('staff_id, total_amount, created_at').gte('created_at', yearAgo)
+
+    const statsMap: Record<string, Record<string, { count: number; total: number }>> = {}
+    sales?.forEach(s => {
+      if (!s.staff_id) return
+      const d = new Date(s.created_at)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      if (!statsMap[s.staff_id]) statsMap[s.staff_id] = {}
+      if (!statsMap[s.staff_id][key]) statsMap[s.staff_id][key] = { count: 0, total: 0 }
+      statsMap[s.staff_id][key].count++
+      statsMap[s.staff_id][key].total += s.total_amount
+    })
+
+    // Build last 12 months labels
+    const monthKeys: { key: string; label: string }[] = []
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(new Date().getFullYear(), new Date().getMonth() - i, 1)
+      monthKeys.push({
+        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+        label: d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }),
+      })
+    }
+
+    setStaff(data.map((m: any) => ({
+      ...m,
+      months: monthKeys.map(mk => ({
+        label: mk.label,
+        count: statsMap[m.id]?.[mk.key]?.count || 0,
+        total: statsMap[m.id]?.[mk.key]?.total || 0,
+      })),
+    })))
   }
 
   useEffect(() => { fetchStaff() }, [])
@@ -108,19 +142,41 @@ export default function StaffPage() {
 
           <div className="space-y-3">
             {staff.map((member) => (
-              <div key={member.id} className="bg-white p-4 rounded-lg shadow flex justify-between items-center">
-                <div>
-                  <p className="font-bold text-gray-900">{member.email}</p>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${member.role === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600'}`}>
-                    {member.role}
-                  </span>
+              <div key={member.id} className="bg-white rounded-lg shadow">
+                <div className="p-4 flex justify-between items-center">
+                  <button onClick={() => setExpandedId(expandedId === member.id ? null : member.id)} className="flex-1 text-left">
+                    <p className="font-bold text-gray-900">{member.email}</p>
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${member.role === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600'}`}>
+                      {member.role}
+                    </span>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {member.months[0]?.label}: {member.months[0]?.count} sales · ₹{member.months[0]?.total.toFixed(0)}
+                    </p>
+                  </button>
+                  <div className="flex items-center gap-3">
+                    <span className="text-gray-400">{expandedId === member.id ? '▲' : '▼'}</span>
+                    <button
+                      onClick={() => handleDelete(member.id, member.email!)}
+                      className="text-red-600 px-2 py-2 active:scale-95"
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => handleDelete(member.id, member.email!)}
-                  className="text-red-600 px-4 py-2 active:scale-95"
-                >
-                  Remove
-                </button>
+                {expandedId === member.id && (
+                  <div className="border-t px-4 pb-4">
+                    <div className="divide-y">
+                      {member.months.map(m => (
+                        <div key={m.label} className="flex justify-between py-2">
+                          <span className="text-sm text-gray-600">{m.label}</span>
+                          <span className="text-sm text-gray-900 font-medium">
+                            {m.count} sales · ₹{m.total.toFixed(0)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
