@@ -30,6 +30,7 @@ export default function POSPage() {
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [paymentMode, setPaymentMode] = useState<'Cash' | 'UPI' | 'Card'>('Cash')
+  const [discount, setDiscount] = useState('')
 
   async function onPhoneChange(phone: string) {
     setCustomerPhone(phone)
@@ -82,7 +83,10 @@ export default function POSPage() {
     else setCart(prev => prev.map(i => i.key === key ? { ...i, quantity } : i))
   }
 
-  const total = cart.reduce((sum, item) => sum + (item.product.selling_price * item.quantity), 0)
+  const subtotal = cart.reduce((sum, item) => sum + (item.product.selling_price * item.quantity), 0)
+  const discountPct = parseFloat(discount) || 0
+  const discountAmt = subtotal * (discountPct / 100)
+  const total = subtotal - discountAmt
 
   async function startScan() {
     processedRef.current = false
@@ -145,7 +149,7 @@ export default function POSPage() {
     }
 
     const { data: sale } = await supabase
-      .from('sales').insert([{ customer_id: customerId, total_amount: total, payment_mode: paymentMode, staff_id: user?.id }]).select('id').single()
+      .from('sales').insert([{ customer_id: customerId, total_amount: total, discount_percent: discountPct, payment_mode: paymentMode, staff_id: user?.id }]).select('id').single()
 
     if (sale) {
       await supabase.from('sale_items').insert(cart.map(item => ({
@@ -159,6 +163,7 @@ export default function POSPage() {
       setCart([])
       setCustomerName('')
       setCustomerPhone('')
+      setDiscount('')
       fetchProducts()
     }
   }
@@ -272,6 +277,13 @@ export default function POSPage() {
                         {mode}
                       </button>
                     ))}
+                  </div>
+                  <div className="text-right text-sm text-gray-500">Subtotal: ₹{subtotal.toFixed(2)}</div>
+                  <div className="flex items-center gap-2">
+                    <input type="number" placeholder="Discount %" min="0" max="100" value={discount}
+                      onChange={(e) => setDiscount(e.target.value)}
+                      className="flex-1 border-2 border-gray-300 rounded-lg px-4 py-3" />
+                    {discountPct > 0 && <span className="text-sm text-red-500 font-medium">-₹{discountAmt.toFixed(2)}</span>}
                   </div>
                   <div className="text-2xl font-bold text-center py-4">Total: ₹{total.toFixed(2)}</div>
                   <button onClick={completeSale}

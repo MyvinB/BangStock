@@ -26,6 +26,7 @@ type Product = {
   selling_price: number
   stock_quantity: number
   image_url: string | null
+  stock_type: string
   product_variants: Variant[]
   product_images: ProductImage[]
 }
@@ -48,7 +49,7 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [customCategory, setCustomCategory] = useState(false)
   const [formData, setFormData] = useState({
-    name: '', category: '', cost_price: '', selling_price: '',
+    name: '', category: '', cost_price: '', selling_price: '', stock_type: 'regular',
   })
 
   async function generateSku(category: string) {
@@ -132,6 +133,7 @@ export default function ProductsPage() {
       selling_price: parseFloat(formData.selling_price),
       stock_quantity: variants.reduce((s, v) => s + v.stock_quantity, 0),
       image_url: uploadedUrls[0] || null,
+      stock_type: formData.stock_type,
     }]).select('id').single()
 
     if (error) { alert(error.message); setUploading(false); return }
@@ -166,6 +168,7 @@ export default function ProductsPage() {
       category: product.category || '',
       cost_price: String(product.cost_price),
       selling_price: String(product.selling_price),
+      stock_type: product.stock_type || 'regular',
     })
     setVariants(product.product_variants?.length > 0
       ? product.product_variants.map(({ id, ...v }) => ({ ...v }))
@@ -179,7 +182,7 @@ export default function ProductsPage() {
   function resetForm() {
     setEditingProduct(null)
     setCustomCategory(false)
-    setFormData({ name: '', category: '', cost_price: '', selling_price: '' })
+    setFormData({ name: '', category: '', cost_price: '', selling_price: '', stock_type: 'regular' })
     setVariants([{ size: 'M', color: 'Black', stock_quantity: 0, sku: '' }])
     setImageFiles([])
     setImagePreviews([])
@@ -206,6 +209,7 @@ export default function ProductsPage() {
       cost_price: parseFloat(formData.cost_price),
       selling_price: parseFloat(formData.selling_price),
       stock_quantity: variants.reduce((s, v) => s + v.stock_quantity, 0),
+      stock_type: formData.stock_type,
       ...(uploadedUrls[0] ? { image_url: uploadedUrls[0] } : {}),
     }).eq('id', editingProduct.id)
 
@@ -244,6 +248,7 @@ export default function ProductsPage() {
       selling_price: product.selling_price,
       stock_quantity: product.stock_quantity,
       image_url: product.image_url,
+      stock_type: product.stock_type || 'regular',
     }]).select('id').single()
     if (error || !newProd) { alert(error?.message || 'Failed'); return }
     if (product.product_variants?.length > 0) {
@@ -383,6 +388,12 @@ export default function ProductsPage() {
               <input type="number" placeholder="Selling Price *" required step="0.01" value={formData.selling_price}
                 onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
                 className="border-2 border-gray-300 rounded-lg px-4 py-3" />
+              <select value={formData.stock_type}
+                onChange={(e) => setFormData({ ...formData, stock_type: e.target.value })}
+                className="border-2 border-gray-300 rounded-lg px-4 py-3">
+                <option value="regular">Regular Stock</option>
+                <option value="deadstock">Dead Stock</option>
+              </select>
             </div>
 
             {/* Images */}
@@ -481,7 +492,9 @@ export default function ProductsPage() {
                 <div className="flex-1">
                   <h3 className="font-bold text-lg text-gray-900">{product.name}</h3>
                   <p className="text-sm text-gray-500">SKU: {product.sku} {product.category && `| ${product.category}`}</p>
-                  <p className="text-sm text-gray-500">Cost: ₹{product.cost_price} | Sell: ₹{product.selling_price}</p>
+                  <p className="text-sm text-gray-500">Cost: ₹{product.cost_price} | Sell: ₹{product.selling_price}
+                    {product.stock_type === 'deadstock' && <span className="ml-2 text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">Dead Stock</span>}
+                  </p>
                   {product.product_variants?.length > 0 && (
                     <p className="text-xs text-indigo-600 mt-1">{product.product_variants.length} variants</p>
                   )}
