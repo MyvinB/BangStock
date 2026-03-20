@@ -36,6 +36,7 @@ function generateVariantSku(base: string, color: string, size: string) {
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<string[]>([])
   const [showForm, setShowForm] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -43,6 +44,8 @@ export default function ProductsPage() {
   const [editingStock, setEditingStock] = useState<{ id: string; value: string } | null>(null)
   const printRef = useRef<HTMLDivElement>(null)
 
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [customCategory, setCustomCategory] = useState(false)
   const [formData, setFormData] = useState({
     name: '', category: '', cost_price: '', selling_price: '',
   })
@@ -67,7 +70,11 @@ export default function ProductsPage() {
       .select('*, product_variants(*), product_images(*)')
       .eq('is_active', true)
       .order('created_at', { ascending: false })
-    if (data) setProducts(data as any)
+    if (data) {
+      setProducts(data as any)
+      const cats = [...new Set((data as any[]).map(p => p.category).filter(Boolean))] as string[]
+      setCategories(cats.sort())
+    }
   }
 
   function handleImageFiles(e: React.ChangeEvent<HTMLInputElement>) {
@@ -146,11 +153,105 @@ export default function ProductsPage() {
     }
 
     setUploading(false)
+    resetForm()
+    fetchProducts()
+  }
+
+  function startEdit(product: Product) {
+    setEditingProduct(product)
+    setCustomCategory(product.category ? !categories.includes(product.category) : false)
+    setFormData({
+      name: product.name,
+      category: product.category || '',
+      cost_price: String(product.cost_price),
+      selling_price: String(product.selling_price),
+    })
+    setVariants(product.product_variants?.length > 0
+      ? product.product_variants.map(v => ({ ...v }))
+      : [{ size: 'M', color: 'Black', stock_quantity: 0, sku: '' }])
+    setImageFiles([])
+    setImagePreviews([])
+    setShowForm(true)
+  }
+
+  function resetForm() {
+    setEditingProduct(null)
+    setCustomCategory(false)
     setFormData({ name: '', category: '', cost_price: '', selling_price: '' })
     setVariants([{ size: 'M', color: 'Black', stock_quantity: 0, sku: '' }])
     setImageFiles([])
     setImagePreviews([])
     setShowForm(false)
+  }
+
+  async function handleUpdate(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editingProduct) return
+    setUploading(true)
+
+    // Upload new images
+    const uploadedUrls: string[] = []
+    for (const file of imageFiles) {
+      const url = await uploadImage(file)
+      if (url) uploadedUrls.push(url)
+    }
+
+    // Update product
+    const { error } = await supabase.from('products').update({
+      name: formData.name,
+      category: formData.category || null,
+      cost_price: parseFloat(formData.cost_price),
+      selling_price: parseFloat(formData.selling_price),
+      stock_quantity: variants.reduce((s, v) => s + v.stock_quantity, 0),
+      ...(uploadedUrls[0] ? { image_url: uploadedUrls[0] } : {}),
+    }).eq('id', editingProduct.id)
+
+    if (error) { alert(error.message); setUploading(false); return }
+
+    // Delete old variants and re-insert
+    await supabase.from('product_variants').delete().eq('product_id', editingProduct.id)
+    if (variants.length > 0) {
+      await supabase.from('product_variants').insert(variants.map(v => ({
+        product_id: editingProduct.id,
+        sku: generateVariantSku(editingProduct.sku, v.color, v.size),
+        size: v.size,
+        color: v.color,
+        stock_quantity: v.stock_quantity,
+      })))
+    }
+
+    // Insert new images
+    if (uploadedUrls.length > 0) {
+      await supabase.from('product_images').insert(uploadedUrls.map(url => ({ product_id: editingProduct.id, url })))
+    }
+
+    setUploading(false)
+    resetForm()
+    fetchProducts()
+  }
+
+  async function duplicateProduct(product: Product) {
+    const sku = await generateSku(product.category || '')
+    const { data: newProd, error } = await supabase.from('products').insert([{
+      sku,
+      name: product.name + ' (Copy)',
+      category: product.category,
+      cost_price: product.cost_price,
+      selling_price: product.selling_price,
+      stock_quantity: product.stock_quantity,
+      image_url: product.image_url,
+    }]).select('id').single()
+    if (error || !newProd) { alert(error?.message || 'Failed'); return }
+    if (product.product_variants?.length > 0) {
+      await supabase.from('product_variants').insert(product.product_variants.map(v => ({
+        product_id: newProd.id,
+        sku: generateVariantSku(sku, v.color, v.size),
+        size: v.size, color: v.color, stock_quantity: v.stock_quantity,
+      })))
+    }
+    if (product.product_images?.length > 0) {
+      await supabase.from('product_images').insert(product.product_images.map(img => ({ product_id: newProd.id, url: img.url })))
+    }
     fetchProducts()
   }
 
@@ -201,7 +302,7 @@ export default function ProductsPage() {
             <a href="/admin" className="text-sm opacity-75 hover:opacity-100">← Back</a>
             <h1 className="text-2xl font-bold">Products</h1>
           </div>
-          <button onClick={() => setShowForm(!showForm)}
+          <button onClick={() => { if (showForm) resetForm(); else { setEditingProduct(null); setShowForm(true) } }}
             className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-medium active:scale-95">
             {showForm ? 'Cancel' : '+ Add Product'}
           </button>
@@ -212,14 +313,32 @@ export default function ProductsPage() {
 
         {/* Add Product Form */}
         {showForm && (
-          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md mb-6 space-y-4">
+          <form onSubmit={editingProduct ? handleUpdate : handleSubmit} className="bg-white p-6 rounded-lg shadow-md mb-6 space-y-4">
+            {editingProduct && (
+              <p className="text-sm text-indigo-600 font-medium">Editing: {editingProduct.name} ({editingProduct.sku})</p>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <input type="text" placeholder="Product Name *" required value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="border-2 border-gray-300 rounded-lg px-4 py-3" />
-              <input type="text" placeholder="Category" value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="border-2 border-gray-300 rounded-lg px-4 py-3" />
+              <div className="flex flex-col gap-2">
+                <select
+                  value={customCategory ? '__custom__' : formData.category}
+                  onChange={(e) => {
+                    if (e.target.value === '__custom__') { setCustomCategory(true); setFormData({ ...formData, category: '' }) }
+                    else { setCustomCategory(false); setFormData({ ...formData, category: e.target.value }) }
+                  }}
+                  className="border-2 border-gray-300 rounded-lg px-4 py-3 w-full">
+                  <option value="">Select Category</option>
+                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  <option value="__custom__">+ New Category</option>
+                </select>
+                {customCategory && (
+                  <input type="text" placeholder="Enter new category" autoFocus value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="border-2 border-gray-300 rounded-lg px-4 py-3" />
+                )}
+              </div>
               <input type="number" placeholder="Cost Price *" required step="0.01" value={formData.cost_price}
                 onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
                 className="border-2 border-gray-300 rounded-lg px-4 py-3" />
@@ -278,7 +397,7 @@ export default function ProductsPage() {
 
             <button type="submit" disabled={uploading}
               className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium active:scale-95 disabled:opacity-50">
-              {uploading ? 'Saving...' : 'Add Product'}
+              {uploading ? 'Saving...' : editingProduct ? 'Update Product' : 'Add Product'}
             </button>
           </form>
         )}
@@ -315,6 +434,8 @@ export default function ProductsPage() {
                 </div>
 
                 <div className="flex flex-col gap-2 items-end">
+                  <button onClick={() => startEdit(product)} className="text-indigo-600 text-sm">Edit</button>
+                  <button onClick={() => duplicateProduct(product)} className="text-green-600 text-sm">Duplicate</button>
                   <button onClick={() => deleteProduct(product.id)} className="text-red-500 text-sm">Delete</button>
                   <button onClick={() => setExpandedId(expandedId === product.id ? null : product.id)}
                     className="text-indigo-600 text-sm">

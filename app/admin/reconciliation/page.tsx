@@ -29,6 +29,7 @@ export default function ReconciliationPage() {
     const { data: expenses } = await supabase
       .from('expenses')
       .select('amount')
+      .eq('payment_mode', 'Cash')
       .gte('created_at', start)
       .lte('created_at', end)
 
@@ -78,7 +79,7 @@ export default function ReconciliationPage() {
             <p className="text-2xl font-bold text-purple-600">₹{data.cardSales.toFixed(2)}</p>
           </div>
           <div className="bg-white p-4 rounded-lg shadow">
-            <p className="text-sm text-gray-600">Expenses</p>
+            <p className="text-sm text-gray-600">Cash Expenses</p>
             <p className="text-2xl font-bold text-red-600">₹{data.totalExpenses.toFixed(2)}</p>
           </div>
         </div>
@@ -86,7 +87,7 @@ export default function ReconciliationPage() {
         <div className="bg-white p-4 rounded-lg shadow">
           <p className="text-sm text-gray-600">Expected Cash in Hand</p>
           <p className="text-2xl font-bold text-gray-900">₹{expectedCash.toFixed(2)}</p>
-          <p className="text-xs text-gray-500 mt-1">Cash Sales − Expenses</p>
+          <p className="text-xs text-gray-500 mt-1">Cash Sales − Cash Expenses</p>
         </div>
 
         <div className="bg-white p-4 rounded-lg shadow">
