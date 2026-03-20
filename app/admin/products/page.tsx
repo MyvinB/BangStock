@@ -31,7 +31,7 @@ type Product = {
 }
 
 function generateVariantSku(base: string, color: string, size: string) {
-  return `${base.substring(0, 3).toUpperCase().replace(/\s/g, '')}-${color.substring(0, 3).toUpperCase()}-${size}`.replace(/\s/g, '')
+  return `${base}-${color.substring(0, 3).toUpperCase()}-${size}`.replace(/\s/g, '')
 }
 
 export default function ProductsPage() {
@@ -41,6 +41,7 @@ export default function ProductsPage() {
   const [uploading, setUploading] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [printVariant, setPrintVariant] = useState<{ sku: string; name: string } | null>(null)
+  const [bulkQR, setBulkQR] = useState<{ sku: string; name: string; qty: number }[]>([])
   const [editingStock, setEditingStock] = useState<{ id: string; value: string } | null>(null)
   const printRef = useRef<HTMLDivElement>(null)
 
@@ -61,7 +62,7 @@ export default function ProductsPage() {
   const [variants, setVariants] = useState<Variant[]>([{ size: 'M', color: 'Black', stock_quantity: 0, sku: '' }])
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
-
+  const [existingImages, setExistingImages] = useState<ProductImage[]>([])
   useEffect(() => { fetchProducts() }, [])
 
   async function fetchProducts() {
@@ -167,10 +168,11 @@ export default function ProductsPage() {
       selling_price: String(product.selling_price),
     })
     setVariants(product.product_variants?.length > 0
-      ? product.product_variants.map(v => ({ ...v }))
+      ? product.product_variants.map(({ id, ...v }) => ({ ...v }))
       : [{ size: 'M', color: 'Black', stock_quantity: 0, sku: '' }])
     setImageFiles([])
     setImagePreviews([])
+    setExistingImages(product.product_images || [])
     setShowForm(true)
   }
 
@@ -181,6 +183,7 @@ export default function ProductsPage() {
     setVariants([{ size: 'M', color: 'Black', stock_quantity: 0, sku: '' }])
     setImageFiles([])
     setImagePreviews([])
+    setExistingImages([])
     setShowForm(false)
   }
 
@@ -211,13 +214,14 @@ export default function ProductsPage() {
     // Delete old variants and re-insert
     await supabase.from('product_variants').delete().eq('product_id', editingProduct.id)
     if (variants.length > 0) {
-      await supabase.from('product_variants').insert(variants.map(v => ({
+      const { error: vErr } = await supabase.from('product_variants').insert(variants.map(v => ({
         product_id: editingProduct.id,
         sku: generateVariantSku(editingProduct.sku, v.color, v.size),
         size: v.size,
         color: v.color,
         stock_quantity: v.stock_quantity,
       })))
+      if (vErr) { alert('Variants failed: ' + vErr.message) }
     }
 
     // Insert new images
@@ -243,11 +247,12 @@ export default function ProductsPage() {
     }]).select('id').single()
     if (error || !newProd) { alert(error?.message || 'Failed'); return }
     if (product.product_variants?.length > 0) {
-      await supabase.from('product_variants').insert(product.product_variants.map(v => ({
+      const { error: vErr } = await supabase.from('product_variants').insert(product.product_variants.map(v => ({
         product_id: newProd.id,
         sku: generateVariantSku(sku, v.color, v.size),
         size: v.size, color: v.color, stock_quantity: v.stock_quantity,
       })))
+      if (vErr) { alert('Variants failed: ' + vErr.message) }
     }
     if (product.product_images?.length > 0) {
       await supabase.from('product_images').insert(product.product_images.map(img => ({ product_id: newProd.id, url: img.url })))
@@ -294,6 +299,31 @@ export default function ProductsPage() {
     win?.document.close()
   }
 
+  function toggleBulkQR(sku: string, name: string, qty: number) {
+    setBulkQR(prev => qty <= 0 ? prev.filter(q => q.sku !== sku) : prev.some(q => q.sku === sku) ? prev.map(q => q.sku === sku ? { ...q, qty } : q) : [...prev, { sku, name, qty }])
+  }
+
+  function printBulkQR() {
+    const container = document.getElementById('bulk-qr-hidden')
+    if (!container) return
+    const canvases = container.querySelectorAll('canvas')
+    const labels: string[] = []
+    bulkQR.forEach((item, i) => {
+      const imgData = canvases[i]?.toDataURL('image/png')
+      for (let n = 0; n < item.qty; n++) {
+        labels.push(`<div class="label"><img src="${imgData}" width="120" height="120"/><p><strong>${item.name}</strong></p><p style="color:#666;font-size:10px">${item.sku}</p></div>`)
+      }
+    })
+    const win = window.open('', '_blank')
+    win?.document.write(`<html><head><title>Bulk QR Print</title><style>
+      body{margin:0;padding:16px;font-family:sans-serif}
+      .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+      .label{text-align:center;padding:8px;border:1px solid #ccc;border-radius:6px;break-inside:avoid}
+      p{margin:2px 0;font-size:11px}
+    </style></head><body><div class="grid">${labels.join('')}</div><script>window.onload=()=>window.print()<\/script></body></html>`)
+    win?.document.close()
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-indigo-600 text-white sticky top-0 z-10">
@@ -302,10 +332,18 @@ export default function ProductsPage() {
             <a href="/admin" className="text-sm opacity-75 hover:opacity-100">← Back</a>
             <h1 className="text-2xl font-bold">Products</h1>
           </div>
-          <button onClick={() => { if (showForm) resetForm(); else { setEditingProduct(null); setShowForm(true) } }}
-            className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-medium active:scale-95">
-            {showForm ? 'Cancel' : '+ Add Product'}
-          </button>
+          <div className="flex gap-2">
+            {bulkQR.length > 0 && (
+              <button onClick={printBulkQR}
+                className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-medium active:scale-95">
+                🖨 Print {bulkQR.reduce((s, q) => s + q.qty, 0)} QR
+              </button>
+            )}
+            <button onClick={() => { if (showForm) resetForm(); else { setEditingProduct(null); setShowForm(true) } }}
+              className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-medium active:scale-95">
+              {showForm ? 'Cancel' : '+ Add Product'}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -350,6 +388,22 @@ export default function ProductsPage() {
             {/* Images */}
             <div>
               <label className="block text-base font-semibold text-gray-900 mb-2">Photos</label>
+              {existingImages.length > 0 && (
+                <div className="flex gap-2 mb-3 flex-wrap">
+                  {existingImages.map((img) => (
+                    <div key={img.id} className="relative">
+                      <img src={img.url} className="h-20 w-20 object-cover rounded-lg border" />
+                      <button type="button" onClick={async () => {
+                        if (img.id) await supabase.from('product_images').delete().eq('id', img.id)
+                        setExistingImages(p => p.filter(i => i.id !== img.id))
+                        if (existingImages.length === 1 && editingProduct) {
+                          await supabase.from('products').update({ image_url: null }).eq('id', editingProduct.id)
+                        }
+                      }} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <input type="file" accept="image/*" multiple onChange={handleImageFiles}
                 className="w-full border-2 border-gray-300 rounded-lg px-4 py-3" />
               {imagePreviews.length > 0 && (
@@ -491,6 +545,10 @@ export default function ProductsPage() {
                               className="text-xs bg-indigo-600 text-white px-2 py-1 rounded active:scale-95">
                               🖨 Print QR
                             </button>
+                            <input type="number" min="0" placeholder="Qty"
+                              value={bulkQR.find(q => q.sku === v.sku)?.qty || ''}
+                              onChange={(e) => toggleBulkQR(v.sku, `${product.name} ${v.color} ${v.size}`, parseInt(e.target.value) || 0)}
+                              className="w-14 border-2 border-gray-300 rounded px-1 py-0.5 text-xs text-center" />
                           </div>
                         </div>
                       ))}
@@ -528,6 +586,11 @@ export default function ProductsPage() {
           </div>
         </div>
       )}
+
+      {/* Hidden bulk QR canvases for printing */}
+      <div id="bulk-qr-hidden" style={{ position: 'absolute', left: '-9999px' }}>
+        {bulkQR.map(q => <QRCodeCanvas key={q.sku} value={q.sku} size={120} />)}
+      </div>
     </div>
   )
 }
