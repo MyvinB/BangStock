@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { QRCodeCanvas } from 'qrcode.react'
+import { printLabel, connectPrinter, isWebUSBSupported } from '@/lib/thermal-print'
 
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size']
 const COLORS = ['Black', 'White', 'Red', 'Blue', 'Green', 'Yellow', 'Pink', 'Grey', 'Brown', 'Navy', 'Orange', 'Purple']
@@ -281,6 +282,20 @@ export default function ProductsPage() {
   }
 
   function printQR() {
+    if (!printVariant) return
+    if (isWebUSBSupported()) {
+      printLabel(printVariant.name, printVariant.sku).then(() => {
+        setPrintVariant(null)
+      }).catch(err => {
+        alert('Print failed: ' + err.message + '. Falling back to browser print.')
+        fallbackPrintQR()
+      })
+    } else {
+      fallbackPrintQR()
+    }
+  }
+
+  function fallbackPrintQR() {
     const canvas = printRef.current?.querySelector('canvas')
     if (!canvas) return
     const imgData = canvas.toDataURL('image/png')
@@ -288,15 +303,22 @@ export default function ProductsPage() {
     win?.document.write(`
       <html><head><title>Print QR</title>
       <style>
-        body { display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif; }
-        .label { text-align:center; padding:12px; border:1px solid #ccc; border-radius:8px; }
-        p { margin:4px 0; font-size:12px; }
+        @page { size: 45mm 25mm; margin: 0; }
+        body { margin:0; padding:0; font-family:sans-serif; }
+        .label { width:45mm; height:25mm; display:flex; align-items:center; padding:1.5mm 2mm; box-sizing:border-box; gap:2mm; }
+        .label img { width:20mm; height:20mm; flex-shrink:0; }
+        .label .info { flex:1; overflow:hidden; }
+        .label .info p { margin:0; line-height:1.2; }
+        .label .info .name { font-size:7pt; font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .label .info .sku { font-size:6pt; color:#444; }
       </style></head>
       <body>
         <div class="label">
-          <img src="${imgData}" width="160" height="160" />
-          <p><strong>${printVariant?.name}</strong></p>
-          <p style="color:#666">${printVariant?.sku}</p>
+          <img src="${imgData}" />
+          <div class="info">
+            <p class="name">${printVariant?.name}</p>
+            <p class="sku">${printVariant?.sku}</p>
+          </div>
         </div>
         <script>window.onload=()=>window.print()<\/script>
       </body></html>
@@ -309,6 +331,24 @@ export default function ProductsPage() {
   }
 
   function printBulkQR() {
+    if (isWebUSBSupported()) {
+      (async () => {
+        try {
+          for (const item of bulkQR) {
+            await printLabel(item.name, item.sku, item.qty)
+          }
+          setBulkQR([])
+        } catch (err: any) {
+          alert('Bulk print failed: ' + err.message + '. Falling back to browser print.')
+          fallbackBulkPrintQR()
+        }
+      })()
+    } else {
+      fallbackBulkPrintQR()
+    }
+  }
+
+  function fallbackBulkPrintQR() {
     const container = document.getElementById('bulk-qr-hidden')
     if (!container) return
     const canvases = container.querySelectorAll('canvas')
@@ -316,16 +356,20 @@ export default function ProductsPage() {
     bulkQR.forEach((item, i) => {
       const imgData = canvases[i]?.toDataURL('image/png')
       for (let n = 0; n < item.qty; n++) {
-        labels.push(`<div class="label"><img src="${imgData}" width="120" height="120"/><p><strong>${item.name}</strong></p><p style="color:#666;font-size:10px">${item.sku}</p></div>`)
+        labels.push(`<div class="label"><img src="${imgData}"/><div class="info"><p class="name">${item.name}</p><p class="sku">${item.sku}</p></div></div>`)
       }
     })
     const win = window.open('', '_blank')
     win?.document.write(`<html><head><title>Bulk QR Print</title><style>
-      body{margin:0;padding:16px;font-family:sans-serif}
-      .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-      .label{text-align:center;padding:8px;border:1px solid #ccc;border-radius:6px;break-inside:avoid}
-      p{margin:2px 0;font-size:11px}
-    </style></head><body><div class="grid">${labels.join('')}</div><script>window.onload=()=>window.print()<\/script></body></html>`)
+      @page { size: 45mm 25mm; margin: 0; }
+      body{margin:0;padding:0;font-family:sans-serif}
+      .label{width:45mm;height:25mm;display:flex;align-items:center;padding:1.5mm 2mm;box-sizing:border-box;gap:2mm;page-break-after:always}
+      .label img{width:20mm;height:20mm;flex-shrink:0}
+      .label .info{flex:1;overflow:hidden}
+      .label .info p{margin:0;line-height:1.2}
+      .label .info .name{font-size:7pt;font-weight:bold}
+      .label .info .sku{font-size:6pt;color:#444}
+    </style></head><body>${labels.join('')}<script>window.onload=()=>window.print()<\/script></body></html>`)
     win?.document.close()
   }
 
@@ -338,6 +382,12 @@ export default function ProductsPage() {
             <h1 className="text-2xl font-bold">Products</h1>
           </div>
           <div className="flex gap-2">
+            {isWebUSBSupported() && (
+              <button onClick={() => connectPrinter().then(d => alert(d ? 'Printer connected!' : 'No printer selected'))}
+                className="bg-green-500 text-white px-3 py-2 rounded-lg text-sm font-medium active:scale-95">
+                🔌 Printer
+              </button>
+            )}
             {bulkQR.length > 0 && (
               <button onClick={printBulkQR}
                 className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-medium active:scale-95">

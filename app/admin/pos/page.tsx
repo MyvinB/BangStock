@@ -231,7 +231,17 @@ export default function POSPage() {
           </div>
 
           {/* Cart */}
-          <div className="bg-white p-6 rounded-lg shadow-lg sticky top-24 h-fit">
+          {/* Mobile: show cart toggle button */}
+          {cart.length > 0 && (
+            <button onClick={() => {
+              const el = document.getElementById('pos-cart')
+              el?.scrollIntoView({ behavior: 'smooth' })
+            }}
+              className="lg:hidden fixed bottom-4 right-4 z-20 bg-green-600 text-white px-5 py-3 rounded-full shadow-lg font-bold text-lg active:scale-95">
+              🛒 {cart.reduce((s, i) => s + i.quantity, 0)} · ₹{total.toFixed(0)}
+            </button>
+          )}
+          <div id="pos-cart" className="bg-white p-6 rounded-lg shadow-lg lg:sticky lg:top-24 h-fit">
             <h2 className="text-xl font-bold mb-4">Cart</h2>
             {cart.length === 0 ? (
               <p className="text-gray-500 text-center py-8">Cart is empty</p>

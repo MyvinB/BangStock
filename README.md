@@ -34,6 +34,31 @@ ALTER TABLE expenses DROP COLUMN IF EXISTS date;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true;
 ```
 
+5. Run these indexes for performance:
+```sql
+CREATE INDEX idx_sales_created_at ON sales(created_at DESC);
+CREATE INDEX idx_sales_staff_id ON sales(staff_id);
+CREATE INDEX idx_sales_customer_id ON sales(customer_id);
+CREATE INDEX idx_sales_payment_mode ON sales(payment_mode);
+CREATE INDEX idx_sale_items_sale_id ON sale_items(sale_id);
+CREATE INDEX idx_sale_items_product_id ON sale_items(product_id);
+CREATE INDEX idx_sale_items_variant_id ON sale_items(variant_id);
+CREATE INDEX idx_products_is_active ON products(is_active);
+CREATE INDEX idx_products_category ON products(category);
+CREATE INDEX idx_product_variants_product_id ON product_variants(product_id);
+CREATE INDEX idx_product_images_product_id ON product_images(product_id);
+CREATE INDEX idx_expenses_created_at ON expenses(created_at DESC);
+CREATE INDEX idx_expenses_category ON expenses(category);
+CREATE INDEX idx_cash_reconciliation_date ON cash_reconciliation(date DESC);
+CREATE INDEX idx_audit_log_table_name ON audit_log(table_name);
+CREATE INDEX idx_audit_log_record_id ON audit_log(record_id);
+CREATE INDEX idx_audit_log_user_id ON audit_log(user_id);
+CREATE INDEX idx_audit_log_created_at ON audit_log(created_at DESC);
+CREATE INDEX idx_refunds_sale_id ON refunds(sale_id);
+CREATE INDEX idx_refunds_product_id ON refunds(product_id);
+CREATE INDEX idx_refunds_created_at ON refunds(created_at DESC);
+```
+
 ### 4. Enable Storage
 1. Go to Storage in Supabase Dashboard
 2. Create a new bucket called `product-images`
