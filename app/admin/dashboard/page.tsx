@@ -3,8 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import AdminOnly from '@/components/AdminOnly'
-
-const LOW_STOCK_KEY = 'lowStockThreshold'
+import { LOW_STOCK_KEY } from '@/lib/constants'
 
 type TopProduct = { name: string; qty: number; revenue: number }
 type LowStockProduct = { name: string; stock_quantity: number }

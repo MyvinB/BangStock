@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { BrowserQRCodeReader } from '@zxing/browser'
-import type { Product, Variant, CartItem } from '@/types'
+import type { Product, Variant, CartItem, PaymentMode } from '@/types'
+import { PAYMENT_MODES } from '@/lib/constants'
 
 export default function POSPage() {
   const { user } = useAuth()
@@ -12,7 +13,7 @@ export default function POSPage() {
   const [cart, setCart] = useState<CartItem[]>([])
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
-  const [paymentMode, setPaymentMode] = useState<'Cash' | 'UPI' | 'Card'>('Cash')
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('Cash')
   const [discount, setDiscount] = useState('')
 
   async function onPhoneChange(phone: string) {
@@ -264,7 +265,7 @@ export default function POSPage() {
                     onChange={(e) => setCustomerName(e.target.value)}
                     className="w-full border-2 border-gray-300 rounded-lg px-4 py-3" />
                   <div className="flex gap-2">
-                    {(['Cash', 'UPI', 'Card'] as const).map((mode) => (
+                    {PAYMENT_MODES.map((mode) => (
                       <button key={mode} onClick={() => setPaymentMode(mode)}
                         className={`flex-1 py-3 rounded-lg font-medium ${paymentMode === mode ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}`}>
                         {mode}
