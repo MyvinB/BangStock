@@ -3,8 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import type { User } from '@supabase/supabase-js'
-
-type Role = 'admin' | 'staff'
+import type { Role } from '@/types'
 
 type AuthContextType = {
   user: User | null

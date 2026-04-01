@@ -4,33 +4,10 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { QRCodeCanvas } from 'qrcode.react'
 import { printLabel, connectPrinter, isWebUSBSupported } from '@/lib/thermal-print'
+import type { Product, Variant, ProductImage } from '@/types'
 
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size']
 const COLORS = ['Black', 'White', 'Red', 'Blue', 'Green', 'Yellow', 'Pink', 'Grey', 'Brown', 'Navy', 'Orange', 'Purple']
-
-type Variant = {
-  id?: string
-  size: string
-  color: string
-  stock_quantity: number
-  sku: string
-}
-
-type ProductImage = { id?: string; url: string }
-
-type Product = {
-  id: string
-  sku: string
-  name: string
-  category: string | null
-  cost_price: number
-  selling_price: number
-  stock_quantity: number
-  image_url: string | null
-  stock_type: string
-  product_variants: Variant[]
-  product_images: ProductImage[]
-}
 
 function generateVariantSku(base: string, color: string, size: string) {
   return `${base}-${color.substring(0, 3).toUpperCase()}-${size}`.replace(/\s/g, '')

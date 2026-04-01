@@ -3,23 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
-
-type Expense = {
-  id: string
-  description: string
-  amount: number
-  category: string | null
-  payment_mode: string
-  image_url: string | null
-  created_at: string
-}
-
-type Product = {
-  id: string
-  name: string
-  cost_price: number
-  product_variants: { id: string; color: string; size: string; stock_quantity: number }[]
-}
+import type { Expense, Product } from '@/types'
 
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([])

@@ -4,24 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { BrowserQRCodeReader } from '@zxing/browser'
-
-type Variant = { id: string; size: string; color: string; stock_quantity: number; sku: string }
-
-type Product = {
-  id: string
-  name: string
-  selling_price: number
-  stock_quantity: number
-  image_url: string | null
-  product_variants: Variant[]
-}
-
-type CartItem = {
-  key: string
-  product: Product
-  variant: Variant | null
-  quantity: number
-}
+import type { Product, Variant, CartItem } from '@/types'
 
 export default function POSPage() {
   const { user } = useAuth()
