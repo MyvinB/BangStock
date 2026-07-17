@@ -90,87 +90,110 @@ export default function StaffPage() {
 
   return (
     <AdminOnly>
-      <div className="min-h-screen bg-gray-50">
-        <header className="bg-indigo-600 text-white sticky top-0 z-10">
-          <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+      <div className="min-h-screen bg-slate-50/50 text-slate-900 relative overflow-hidden flex flex-col">
+        {/* Decorative Radial Glowing Backdrops */}
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-10 right-1/4 w-[400px] h-[400px] bg-violet-600/5 rounded-full blur-[100px] pointer-events-none" />
+
+        {/* Sticky Header */}
+        <header className="bg-white/80 backdrop-blur-md sticky top-0 z-20 border-b border-slate-200/80">
+          <div className="container mx-auto px-6 py-4 flex justify-between items-center">
             <div>
-              <a href="/admin" className="text-sm opacity-75 hover:opacity-100">← Back</a>
-              <h1 className="text-2xl font-bold">Staff Management</h1>
+              <a href="/admin" className="text-xs text-indigo-600 hover:underline flex items-center gap-1 mb-0.5">
+                <span>←</span> Back to Operations
+              </a>
+              <h1 className="text-xl font-extrabold tracking-tight text-slate-900">Staff Management</h1>
             </div>
             <button
               onClick={() => setShowForm(!showForm)}
-              className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-medium active:scale-95"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-bold active:scale-95 transition-all shadow-lg shadow-indigo-600/15"
             >
               {showForm ? 'Cancel' : '+ Add Staff'}
             </button>
           </div>
         </header>
 
-        <main className="container mx-auto px-4 py-6">
+        <main className="container mx-auto px-6 py-8 flex-1 max-w-3xl">
           {showForm && (
-            <form onSubmit={handleAdd} className="bg-white p-6 rounded-lg shadow-md mb-6 space-y-3">
-              <input
-                type="email"
-                placeholder="Email *"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full border-2 border-gray-300 rounded-lg px-4 py-3"
-              />
-              <input
-                type="password"
-                placeholder="Password *"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full border-2 border-gray-300 rounded-lg px-4 py-3"
-              />
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-full border-2 border-gray-300 rounded-lg px-4 py-3"
-              >
-                <option value="staff">Staff</option>
-                <option value="admin">Admin</option>
-              </select>
-              {error && <p className="text-red-600 text-sm">{error}</p>}
-              <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium active:scale-95">
+            <form onSubmit={handleAdd} className="bg-white border border-slate-200/60 p-6 rounded-2xl shadow-xl mb-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 ml-1">Email Address</label>
+                  <input
+                    type="email"
+                    placeholder="Email *"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-4 py-3 bg-white text-sm focus:outline-none focus:border-indigo-500 text-slate-900"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 ml-1">Password</label>
+                  <input
+                    type="password"
+                    placeholder="Password *"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-4 py-3 bg-white text-sm focus:outline-none focus:border-indigo-500 text-slate-900"
+                  />
+                </div>
+                <div className="space-y-1 col-span-1 md:col-span-2">
+                  <label className="text-xs font-bold text-slate-500 ml-1">Access Role Privilege</label>
+                  <select
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-4 py-3 bg-white text-sm focus:outline-none focus:border-indigo-500 text-slate-900"
+                  >
+                    <option value="staff">Staff Member</option>
+                    <option value="admin">Administrator</option>
+                  </select>
+                </div>
+              </div>
+              {error && <p className="text-red-600 text-xs font-bold">⚠️ {error}</p>}
+              <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all shadow-lg shadow-indigo-600/15">
                 Create Account
               </button>
             </form>
           )}
 
-          <div className="space-y-3">
+          <div className="space-y-4">
             {staff.map((member) => (
-              <div key={member.id} className="bg-white rounded-lg shadow">
-                <div className="p-4 flex justify-between items-center">
-                  <button onClick={() => setExpandedId(expandedId === member.id ? null : member.id)} className="flex-1 text-left">
-                    <p className="font-bold text-gray-900">{member.email}</p>
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${member.role === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600'}`}>
-                      {member.role}
-                    </span>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {member.months[0]?.label}: {member.months[0]?.count} sales · ₹{member.months[0]?.total.toFixed(0)}
+              <div key={member.id} className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm hover:border-slate-350 hover:shadow-md transition-all duration-300">
+                <div className="p-5 flex justify-between items-center gap-4">
+                  <button onClick={() => setExpandedId(expandedId === member.id ? null : member.id)} className="flex-1 text-left space-y-1.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-extrabold text-base text-slate-900 tracking-tight leading-tight">{member.email}</p>
+                      <span className={`text-[10px] font-bold border px-2.5 py-0.5 rounded-full uppercase ${member.role === 'admin' ? 'bg-indigo-50 border-indigo-150 text-indigo-600' : 'bg-slate-100 border-slate-200 text-slate-600'}`}>
+                        {member.role}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 font-semibold">
+                      {member.months[0]?.label}: <span className="font-bold text-slate-700">{member.months[0]?.count} sales</span> · <span className="text-indigo-600 font-bold">₹{member.months[0]?.total.toFixed(0)}</span>
                     </p>
                   </button>
                   <div className="flex items-center gap-3">
-                    <span className="text-gray-400">{expandedId === member.id ? '▲' : '▼'}</span>
+                    <span className="text-slate-400 font-semibold text-sm bg-slate-100 p-2 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer" onClick={() => setExpandedId(expandedId === member.id ? null : member.id)}>
+                      {expandedId === member.id ? 'Hide Performance ▲' : 'View Performance ▼'}
+                    </span>
                     <button
                       onClick={() => handleDelete(member.id, member.email!)}
-                      className="text-red-600 px-2 py-2 active:scale-95"
+                      className="text-xs font-semibold text-rose-500 hover:underline"
                     >
                       Remove
                     </button>
                   </div>
                 </div>
                 {expandedId === member.id && (
-                  <div className="border-t px-4 pb-4">
-                    <div className="divide-y">
+                  <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-4 space-y-3">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Performance Ledger (Last 12 Months)</h4>
+                    <div className="divide-y divide-slate-100 bg-white border border-slate-200/50 rounded-xl overflow-hidden">
                       {member.months.map(m => (
-                        <div key={m.label} className="flex justify-between py-2">
-                          <span className="text-sm text-gray-600">{m.label}</span>
-                          <span className="text-sm text-gray-900 font-medium">
-                            {m.count} sales · ₹{m.total.toFixed(0)}
+                        <div key={m.label} className="flex justify-between py-3 px-4 hover:bg-slate-50/20 transition-colors">
+                          <span className="text-xs text-slate-500 font-semibold">{m.label}</span>
+                          <span className="text-xs text-slate-900 font-bold">
+                            {m.count} sales · <span className="text-indigo-600">₹{m.total.toFixed(0)}</span>
                           </span>
                         </div>
                       ))}

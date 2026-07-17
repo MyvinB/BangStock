@@ -431,198 +431,229 @@ export default function ProductsPage() {
   const customSizes = Array.from(new Set(
     products.flatMap(p => p.product_variants || []).map(v => v.size).filter(Boolean)
   )).filter(s => !SIZES.includes(s as any))
+  
   const dynamicSizes = [...SIZES, ...customSizes]
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-indigo-600 text-white sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+    <div className="min-h-screen bg-slate-50/50 text-slate-900 relative overflow-hidden flex flex-col">
+      {/* Decorative Radial Glowing Backdrops */}
+      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-10 right-1/4 w-[400px] h-[400px] bg-violet-600/5 rounded-full blur-[100px] pointer-events-none" />
+
+      {/* Sticky Header */}
+      <header className="bg-white/80 backdrop-blur-md sticky top-0 z-20 border-b border-slate-200/80">
+        <div className="container mx-auto px-6 py-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div>
-            <a href="/admin" className="text-sm opacity-75 hover:opacity-100">← Back</a>
-            <h1 className="text-2xl font-bold">Products</h1>
+            <a href="/admin" className="text-xs text-indigo-600 hover:underline flex items-center gap-1 mb-0.5">
+              <span>←</span> Back to Operations
+            </a>
+            <h1 className="text-xl font-extrabold tracking-tight text-slate-900">Products Management</h1>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2.5">
             {isWebUSBSupported() && (
               <button onClick={() => connectPrinter().then(d => alert(d ? 'Printer connected!' : 'No printer selected'))}
-                className="bg-green-500 text-white px-3 py-2 rounded-lg text-sm font-medium active:scale-95">
+                className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-3.5 py-2 rounded-xl text-xs font-semibold active:scale-95 border border-slate-200/50 transition-all">
                 🔌 Printer
               </button>
             )}
             <button onClick={() => {
               setBulkPrintMode(!bulkPrintMode);
-              if (bulkPrintMode) setBulkQR([]); // Clear selection when turning off print mode
+              if (bulkPrintMode) setBulkQR([]);
             }}
-              className={`px-4 py-2 rounded-lg text-sm font-medium active:scale-95 transition-colors ${bulkPrintMode ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-white text-indigo-600'}`}>
+              className={`px-4 py-2 rounded-xl text-xs font-semibold active:scale-95 transition-all duration-200 ${bulkPrintMode ? 'bg-orange-600 hover:bg-orange-500 text-white shadow-lg shadow-orange-600/10' : 'bg-slate-100 text-slate-700 border border-slate-200/50 hover:bg-slate-200'}`}>
               {bulkPrintMode ? '✕ Exit Print Mode' : '🖨 Bulk Print Mode'}
             </button>
             {bulkQR.length > 0 && (
               <div className="flex gap-2">
                 <button onClick={() => setBulkQR([])}
-                  className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-medium active:scale-95">
+                  className="bg-red-600 hover:bg-red-500 text-white px-3.5 py-2 rounded-xl text-xs font-semibold active:scale-95 shadow-lg shadow-red-600/10">
                   ✕ Clear All
                 </button>
                 <button onClick={printBulkQR}
-                  className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-medium active:scale-95">
+                  className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl text-xs font-bold active:scale-95 shadow-lg shadow-green-600/10">
                   🖨 Print {bulkQR.reduce((s, q) => s + q.qty, 0)} QR
                 </button>
               </div>
             )}
             <button onClick={() => { if (showForm) resetForm(); else { setEditingProduct(null); setShowForm(true) } }}
-              className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-medium active:scale-95">
+              className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-bold active:scale-95 transition-all shadow-lg shadow-indigo-600/15">
               {showForm ? 'Cancel' : '+ Add Product'}
             </button>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6">
-
-        {/* Add Product Form */}
+      <main className="container mx-auto px-6 py-8 flex-1 max-w-5xl">
+        {/* Add/Edit Product Form */}
         {showForm && (
-          <form onSubmit={editingProduct ? handleUpdate : handleSubmit} className="bg-white p-6 rounded-lg shadow-md mb-6 space-y-4">
+          <form onSubmit={editingProduct ? handleUpdate : handleSubmit} className="bg-white border border-slate-200/60 p-6 rounded-2xl shadow-xl mb-8 space-y-6">
             {editingProduct && (
-              <p className="text-sm text-indigo-600 font-medium">Editing: {editingProduct.name} ({editingProduct.sku})</p>
+              <p className="text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-lg w-fit">
+                Editing Product: {editingProduct.name} ({editingProduct.sku})
+              </p>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input type="text" placeholder="Product Name *" required value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="border-2 border-gray-300 rounded-lg px-4 py-3" />
-              <div className="flex flex-col gap-2">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 ml-1">Product Name</label>
+                <input type="text" placeholder="Product Name *" required value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 bg-white text-sm focus:outline-none focus:border-indigo-500 text-slate-900" />
+              </div>
+              
+              <div className="space-y-1 flex flex-col justify-end">
+                <label className="text-xs font-bold text-slate-500 ml-1 mb-1">Category</label>
                 <select
                   value={customCategory ? '__custom__' : formData.category}
                   onChange={(e) => {
                     if (e.target.value === '__custom__') { setCustomCategory(true); setFormData({ ...formData, category: '' }) }
                     else { setCustomCategory(false); setFormData({ ...formData, category: e.target.value }) }
                   }}
-                  className="border-2 border-gray-300 rounded-lg px-4 py-3 w-full">
+                  className="border border-slate-200 rounded-xl px-4 py-3 bg-white text-sm focus:outline-none focus:border-indigo-500 w-full text-slate-900">
                   <option value="">Select Category</option>
                   {categories.map(c => <option key={c} value={c}>{c}</option>)}
                   <option value="__custom__">+ New Category</option>
                 </select>
                 {customCategory && (
-                  <input type="text" placeholder="Enter new category" autoFocus value={formData.category}
+                  <input type="text" placeholder="Enter new category name" autoFocus value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="border-2 border-gray-300 rounded-lg px-4 py-3" />
+                    className="border border-slate-200 rounded-xl px-4 py-3 bg-white text-sm focus:outline-none focus:border-indigo-500 mt-2 text-slate-900" />
                 )}
               </div>
-              <input type="number" placeholder="Cost Price *" required step="0.01" value={formData.cost_price}
-                onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
-                className="border-2 border-gray-300 rounded-lg px-4 py-3" />
-              <input type="number" placeholder="Selling Price *" required step="0.01" value={formData.selling_price}
-                onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
-                className="border-2 border-gray-300 rounded-lg px-4 py-3" />
-              <select value={formData.stock_type}
-                onChange={(e) => setFormData({ ...formData, stock_type: e.target.value })}
-                className="border-2 border-gray-300 rounded-lg px-4 py-3">
-                <option value="regular">Regular Stock</option>
-                <option value="deadstock">Dead Stock</option>
-              </select>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 ml-1">Cost Price (₹)</label>
+                <input type="number" placeholder="Cost Price *" required step="0.01" value={formData.cost_price}
+                  onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 bg-white text-sm focus:outline-none focus:border-indigo-500 text-slate-900" />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 ml-1">Selling Price (₹)</label>
+                <input type="number" placeholder="Selling Price *" required step="0.01" value={formData.selling_price}
+                  onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 bg-white text-sm focus:outline-none focus:border-indigo-500 text-slate-900" />
+              </div>
+
+              <div className="space-y-1 col-span-1 md:col-span-2">
+                <label className="text-xs font-bold text-slate-500 ml-1">Stock Classification</label>
+                <select value={formData.stock_type}
+                  onChange={(e) => setFormData({ ...formData, stock_type: e.target.value })}
+                  className="border border-slate-200 rounded-xl px-4 py-3 bg-white text-sm focus:outline-none focus:border-indigo-500 w-full text-slate-900">
+                  <option value="regular">Regular Stock</option>
+                  <option value="deadstock">Dead Stock (Clearance)</option>
+                </select>
+              </div>
             </div>
 
-            {/* Images */}
-            <div>
-              <label className="block text-base font-semibold text-gray-900 mb-2">Photos</label>
+            {/* Images Drop/Selector */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-slate-700">Product Photos</label>
               {existingImages.length > 0 && (
-                <div className="flex gap-2 mb-3 flex-wrap">
+                <div className="flex gap-3 mb-3 flex-wrap">
                   {existingImages.map((img) => (
-                    <div key={img.id} className="relative">
-                      <img src={img.url} className="h-20 w-20 object-cover rounded-lg border" />
+                    <div key={img.id} className="relative group rounded-xl overflow-hidden border border-slate-200">
+                      <img src={img.url} className="h-20 w-20 object-cover" />
                       <button type="button" onClick={async () => {
                         if (img.id) await supabase.from('product_images').delete().eq('id', img.id)
                         setExistingImages(p => p.filter(i => i.id !== img.id))
                         if (existingImages.length === 1 && editingProduct) {
                           await supabase.from('products').update({ image_url: null }).eq('id', editingProduct.id)
                         }
-                      }} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">✕</button>
+                      }} className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 text-[10px] flex items-center justify-center hover:bg-red-650 transition-colors">✕</button>
                     </div>
                   ))}
                 </div>
               )}
               <input type="file" accept="image/*" multiple onChange={handleImageFiles}
-                className="w-full border-2 border-gray-300 rounded-lg px-4 py-3" />
+                className="w-full border border-slate-200 rounded-xl px-4 py-3 bg-white text-sm focus:outline-none file:bg-slate-100 file:border-0 file:text-slate-800 file:px-3 file:py-1 file:rounded-lg file:mr-4 file:text-xs file:font-semibold" />
               {imagePreviews.length > 0 && (
-                <div className="flex gap-2 mt-3 flex-wrap">
+                <div className="flex gap-3 mt-3 flex-wrap">
                   {imagePreviews.map((src, i) => (
-                    <div key={i} className="relative">
-                      <img src={src} className="h-20 w-20 object-cover rounded-lg border" />
+                    <div key={i} className="relative group rounded-xl overflow-hidden border border-slate-200">
+                      <img src={src} className="h-20 w-20 object-cover" />
                       <button type="button" onClick={() => {
                         setImagePreviews(p => p.filter((_, j) => j !== i))
                         setImageFiles(p => p.filter((_, j) => j !== i))
-                      }} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">✕</button>
+                      }} className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 text-[10px] flex items-center justify-center hover:bg-red-650 transition-colors">✕</button>
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Variants */}
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="text-base font-semibold text-gray-900">Size & Color Variants</label>
+            {/* Variants Grid */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <label className="text-sm font-semibold text-slate-700">Sizes & Color Options</label>
                 <button type="button" onClick={addVariant}
-                  className="text-sm text-indigo-600 font-medium">+ Add Variant</button>
+                  className="text-xs text-indigo-600 hover:text-indigo-700 font-bold flex items-center gap-1">
+                  <span>+</span> Add Variant Dimension
+                </button>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {variants.map((v, i) => (
-                  <div key={i} className="grid grid-cols-4 gap-2 items-center">
+                  <div key={i} className="grid grid-cols-4 gap-3 items-center bg-slate-50 border border-slate-150 p-4 rounded-xl">
                     <select value={v.size} onChange={(e) => updateVariant(i, 'size', e.target.value)}
-                      className="w-full border-2 border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs bg-white text-slate-900">
                       {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
-                     {v.isCustomColor ? (
-                       <div className="relative flex items-center">
-                         <input type="text" placeholder="Color *" value={v.color}
-                           onChange={(e) => updateVariant(i, 'color', e.target.value)}
-                           className="w-full border-2 border-gray-300 rounded-lg pl-3 pr-8 py-2 text-sm bg-white" />
-                         <button type="button" onClick={() => {
-                           updateVariant(i, 'isCustomColor', false);
-                           updateVariant(i, 'color', 'Black');
-                         }}
-                           className="absolute right-2 text-gray-400 hover:text-red-500 text-sm">✕</button>
-                       </div>
-                     ) : (
-                       <select value={v.color}
-                         onChange={(e) => {
-                           if (e.target.value === 'ADD_CUSTOM') {
-                             updateVariant(i, 'isCustomColor', true);
-                             updateVariant(i, 'color', '');
-                           } else {
-                             updateVariant(i, 'color', e.target.value);
-                           }
-                         }}
-                         className="w-full border-2 border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-                         {dynamicColors.map(c => <option key={c} value={c}>{c}</option>)}
-                         <option value="ADD_CUSTOM" className="text-indigo-600 font-semibold">+ Custom Color...</option>
-                       </select>
-                     )}
-                    <input type="number" placeholder="Stock" min="0" value={v.stock_quantity === 0 ? '' : v.stock_quantity}
+                    
+                    {v.isCustomColor ? (
+                      <div className="relative flex items-center">
+                        <input type="text" placeholder="Color *" value={v.color}
+                          onChange={(e) => updateVariant(i, 'color', e.target.value)}
+                          className="w-full border border-slate-200 rounded-xl pl-3 pr-8 py-2 text-xs bg-white text-slate-900 placeholder-slate-400" />
+                        <button type="button" onClick={() => {
+                          updateVariant(i, 'isCustomColor', false);
+                          updateVariant(i, 'color', 'Black');
+                        }}
+                          className="absolute right-2 text-slate-400 hover:text-red-500 text-sm">✕</button>
+                      </div>
+                    ) : (
+                      <select value={v.color}
+                        onChange={(e) => {
+                          if (e.target.value === 'ADD_CUSTOM') {
+                            updateVariant(i, 'isCustomColor', true);
+                            updateVariant(i, 'color', '');
+                          } else {
+                            updateVariant(i, 'color', e.target.value);
+                          }
+                        }}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs bg-white text-slate-900">
+                        {dynamicColors.map(c => <option key={c} value={c}>{c}</option>)}
+                        <option value="ADD_CUSTOM" className="text-indigo-600 font-semibold">+ Custom Color...</option>
+                      </select>
+                    )}
+
+                    <input type="number" placeholder="Quantity" min="0" value={v.stock_quantity === 0 ? '' : v.stock_quantity}
                       onChange={(e) => updateVariant(i, 'stock_quantity', e.target.value === '' ? 0 : parseInt(e.target.value))}
-                      className="border-2 border-gray-300 rounded-lg px-3 py-2 text-sm" />
-                     <div className="flex gap-2 text-sm">
-                       <button type="button" onClick={() => duplicateVariant(i)}
-                         className="text-indigo-600 font-medium hover:underline">Duplicate</button>
-                       <button type="button" onClick={() => removeVariant(i)}
-                         className="text-red-500 hover:underline">Remove</button>
-                     </div>
+                      className="border border-slate-200 rounded-xl px-3 py-2 text-xs bg-white text-slate-900" />
+                    
+                    <div className="flex gap-3 text-xs justify-end pr-1">
+                      <button type="button" onClick={() => duplicateVariant(i)}
+                        className="text-indigo-600 hover:text-indigo-700 font-semibold">Clone</button>
+                      <button type="button" onClick={() => removeVariant(i)}
+                        className="text-red-500 hover:text-red-600 font-semibold">Remove</button>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
 
             <button type="submit" disabled={uploading}
-              className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium active:scale-95 disabled:opacity-50">
-              {uploading ? 'Saving...' : editingProduct ? 'Update Product' : 'Add Product'}
+              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-indigo-600/15">
+              {uploading ? 'Saving product details...' : editingProduct ? 'Save Product Details' : 'Register New Product'}
             </button>
           </form>
         )}
 
-        {/* Product List */}
-        <div className="space-y-3">
+        {/* Product Modules List */}
+        <div className="space-y-4">
           {products.map((product) => (
-            <div key={product.id} className="bg-white rounded-lg shadow overflow-hidden">
-              {/* Product Row */}
-              <div className="p-4 flex gap-4 items-center">
-                {/* Product Checkbox (Select all variants for bulk QR) */}
+            <div key={product.id} className="bg-white border border-slate-200/65 rounded-2xl overflow-hidden shadow-sm hover:border-slate-350 hover:shadow-md transition-all duration-300">
+              {/* Product Header Row */}
+              <div className="p-5 flex gap-5 items-center">
+                {/* Print mode multi check */}
                 {bulkPrintMode && product.product_variants?.length > 0 && (
                   <input type="checkbox"
                     checked={product.product_variants.every(v => bulkQR.some(q => q.sku === v.sku))}
@@ -645,16 +676,17 @@ export default function ProductsPage() {
                         setBulkQR(prev => prev.filter(q => !skus.includes(q.sku)));
                       }
                     }}
-                    className="w-5 h-5 rounded text-indigo-600 border-gray-300 focus:ring-indigo-500 cursor-pointer flex-shrink-0" />
+                    className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer flex-shrink-0 bg-transparent" />
                 )}
-                {/* Image */}
-                <label className="cursor-pointer flex-shrink-0 relative group">
+                
+                {/* Photo Thumbnail */}
+                <label className="cursor-pointer flex-shrink-0 relative group rounded-xl overflow-hidden border border-slate-200">
                   {product.image_url ? (
-                    <img src={product.image_url} alt={product.name} className="w-16 h-16 object-cover rounded-lg" />
+                    <img src={product.image_url} alt={product.name} className="w-16 h-16 object-cover" />
                   ) : (
-                    <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">📦</div>
+                    <div className="w-16 h-16 bg-slate-50 border border-slate-100 flex items-center justify-center text-2xl">📦</div>
                   )}
-                  <div className="absolute inset-0 bg-black bg-opacity-40 rounded-lg opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-medium">Upload</div>
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] font-bold transition-opacity">Swap</div>
                   <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
                     const file = e.target.files?.[0]; if (!file) return
                     const url = await uploadImage(file); if (!url) return
@@ -663,38 +695,51 @@ export default function ProductsPage() {
                   }} />
                 </label>
 
-                <div className="flex-1">
-                  <h3 className="font-bold text-lg text-gray-900">{product.name}</h3>
-                  <p className="text-sm text-gray-500">SKU: {product.sku} {product.category && `| ${product.category}`}</p>
-                  <p className="text-sm text-gray-500">Cost: ₹{product.cost_price} | Sell: ₹{product.selling_price}
-                    {product.stock_type === 'deadstock' && <span className="ml-2 text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">Dead Stock</span>}
+                {/* Meta details */}
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-extrabold text-base tracking-tight text-slate-900">{product.name}</h3>
+                    {product.stock_type === 'deadstock' && (
+                      <span className="text-[10px] font-bold bg-orange-50 text-orange-600 border border-orange-100 px-2 py-0.5 rounded-full uppercase">
+                        Clearance
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    SKU: <span className="font-mono text-slate-700">{product.sku}</span> 
+                    {product.category && <span className="mx-2 text-slate-300">|</span>}
+                    {product.category && <span className="font-semibold text-slate-700 uppercase">{product.category}</span>}
                   </p>
-                  {product.product_variants?.length > 0 && (
-                    <p className="text-xs text-indigo-600 mt-1">{product.product_variants.length} variants</p>
-                  )}
+                  <p className="text-xs text-slate-500">
+                    Cost: <span className="text-slate-600">₹{product.cost_price}</span> 
+                    <span className="mx-2 text-slate-300">|</span>
+                    Sell: <span className="text-indigo-600 font-bold">₹{product.selling_price}</span>
+                  </p>
                 </div>
 
-                <div className="flex flex-col gap-2 items-end">
-                  <button onClick={() => startEdit(product)} className="text-indigo-600 text-sm">Edit</button>
-                  <button onClick={() => duplicateProduct(product)} className="text-green-600 text-sm">Duplicate</button>
-                  <button onClick={() => deleteProduct(product.id)} className="text-red-500 text-sm">Delete</button>
-                  <button onClick={() => setExpandedId(expandedId === product.id ? null : product.id)}
-                    className="text-indigo-600 text-sm">
-                    {expandedId === product.id ? 'Hide ▲' : 'Variants ▼'}
+                <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3">
+                  <button onClick={() => startEdit(product)} className="text-xs text-indigo-600 hover:underline font-semibold">Edit</button>
+                  <button onClick={() => duplicateProduct(product)} className="text-xs text-emerald-600 hover:underline font-semibold">Duplicate</button>
+                  <button onClick={() => deleteProduct(product.id)} className="text-xs text-rose-600 hover:underline font-semibold">Delete</button>
+                  <button 
+                    onClick={() => setExpandedId(expandedId === product.id ? null : product.id)}
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200/50 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                  >
+                    {expandedId === product.id ? 'Hide variants ▲' : `Manage Variants (${product.product_variants?.length || 0}) ▼`}
                   </button>
                 </div>
               </div>
 
-              {/* Variants Panel */}
+              {/* Variants Panel Dropdown */}
               {expandedId === product.id && (
-                <div className="border-t px-4 py-3 bg-gray-50">
-                  {/* Extra images */}
+                <div className="border-t border-slate-100 px-5 py-4 bg-slate-50/50 space-y-4">
+                  {/* Photo logs */}
                   {product.product_images?.length > 0 && (
-                    <div className="flex gap-2 mb-3 flex-wrap">
+                    <div className="flex gap-2 flex-wrap">
                       {product.product_images.map(img => (
-                        <img key={img.id} src={img.url} className="h-14 w-14 object-cover rounded-lg border" />
+                        <img key={img.id} src={img.url} className="h-12 w-12 object-cover rounded-lg border border-slate-200" />
                       ))}
-                      <label className="h-14 w-14 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer text-gray-400 text-xl hover:border-indigo-400">
+                      <label className="h-12 w-12 border border-dashed border-slate-300 rounded-lg flex items-center justify-center cursor-pointer text-slate-400 text-lg hover:border-indigo-500/50 hover:text-indigo-600 transition-colors">
                         +
                         <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
                           const file = e.target.files?.[0]; if (!file) return
@@ -706,28 +751,30 @@ export default function ProductsPage() {
                     </div>
                   )}
 
-                  {/* Variants table */}
+                  {/* Dimension listings table */}
                   {product.product_variants?.length > 0 ? (
-                    <div className="space-y-2">
+                    <div className="grid gap-2">
                       {product.product_variants.map((v) => (
-                        <div key={v.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border">
-                          <div className="flex items-center gap-3">
-                            <span className="text-sm font-medium text-gray-900">{v.color} / {v.size}</span>
-                            <span className="text-xs text-gray-400">{v.sku}</span>
+                        <div key={v.id} className="flex items-center justify-between bg-white border border-slate-200/60 rounded-xl px-4 py-3">
+                          <div className="space-y-0.5">
+                            <p className="text-xs font-bold text-slate-800 uppercase tracking-wider">{v.color} / {v.size}</p>
+                            <p className="text-[10px] text-slate-500 font-mono">{v.sku}</p>
                           </div>
+                          
                           <div className="flex items-center gap-3">
                             {editingStock?.id === v.id ? (
                               <input type="number" autoFocus value={editingStock!.value}
                                 onChange={(e) => setEditingStock({ id: v.id!, value: e.target.value })}
                                 onBlur={() => saveVariantStock(v.id!, editingStock!.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && saveVariantStock(v.id!, editingStock!.value)}
-                                className="w-16 border-2 border-indigo-400 rounded px-2 py-0.5 text-sm" />
+                                className="w-16 border border-indigo-500 rounded-lg px-2.5 py-1 text-xs bg-white text-slate-900 text-center focus:ring-1 focus:ring-indigo-500" />
                             ) : (
                               <button onClick={() => setEditingStock({ id: v.id!, value: String(v.stock_quantity) })}
-                                className="text-sm font-medium text-indigo-600 underline underline-offset-2">
-                                {v.stock_quantity} in stock
+                                className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:underline">
+                                {v.stock_quantity} units in stock
                               </button>
                             )}
+                            
                             <button onClick={() => setPrintVariant({
                               sku: v.sku,
                               productName: product.name,
@@ -735,43 +782,45 @@ export default function ProductsPage() {
                               size: v.size,
                               price: product.selling_price
                             })}
-                              className="text-xs bg-indigo-600 text-white px-2 py-1 rounded active:scale-95">
+                              className="text-[10px] font-bold bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1.5 rounded-lg active:scale-95 transition-all shadow-sm">
                               🖨 Print QR
                             </button>
-                             {bulkPrintMode && (
-                               <div className="flex items-center gap-1.5 border-l pl-3 ml-1 border-gray-200">
-                                 <input type="checkbox"
-                                   id={`bulk-check-${v.sku}`}
-                                   checked={bulkQR.some(q => q.sku === v.sku)}
-                                   onChange={(e) => {
-                                     if (e.target.checked) {
-                                       toggleBulkQR(v.sku, product.name, 1, v.color, v.size, product.selling_price)
-                                     } else {
-                                       toggleBulkQR(v.sku, product.name, 0)
-                                     }
-                                   }}
-                                   className="w-4 h-4 rounded text-indigo-600 border-gray-300 focus:ring-indigo-500 cursor-pointer" />
-                                 {bulkQR.some(q => q.sku === v.sku) && (
-                                   <input type="number" min="1" placeholder="Qty"
-                                     value={bulkQR.find(q => q.sku === v.sku)?.qty || 1}
-                                     onChange={(e) => toggleBulkQR(
-                                       v.sku,
-                                       product.name,
-                                       parseInt(e.target.value) || 1,
-                                       v.color,
-                                       v.size,
-                                       product.selling_price
-                                     )}
-                                     className="w-12 border-2 border-gray-300 rounded px-1 py-0.5 text-xs text-center" />
-                                 )}
-                               </div>
-                             )}
+
+                            {bulkPrintMode && (
+                              <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
+                                <input type="checkbox"
+                                  id={`bulk-check-${v.sku}`}
+                                  checked={bulkQR.some(q => q.sku === v.sku)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      toggleBulkQR(v.sku, product.name, 1, v.color, v.size, product.selling_price)
+                                    } else {
+                                      toggleBulkQR(v.sku, product.name, 0)
+                                    }
+                                  }}
+                                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer bg-transparent" />
+                                
+                                {bulkQR.some(q => q.sku === v.sku) && (
+                                  <input type="number" min="1" placeholder="Qty"
+                                    value={bulkQR.find(q => q.sku === v.sku)?.qty || 1}
+                                    onChange={(e) => toggleBulkQR(
+                                      v.sku,
+                                      product.name,
+                                      parseInt(e.target.value) || 1,
+                                      v.color,
+                                      v.size,
+                                      product.selling_price
+                                    )}
+                                    className="w-12 border border-slate-300 rounded-lg px-1.5 py-1 text-center text-xs bg-white text-slate-900" />
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-400">No variants added</p>
+                    <p className="text-xs text-slate-550">No variants added for this product dimension</p>
                   )}
                 </div>
               )}
@@ -780,31 +829,36 @@ export default function ProductsPage() {
         </div>
       </main>
 
-      {/* Print QR Modal */}
+      {/* Print QR Modal dialog */}
       {printVariant && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 text-center space-y-4 w-72">
-            <h3 className="font-bold text-gray-900">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center space-y-5 w-80 relative shadow-2xl">
+            <h3 className="font-extrabold text-slate-900 tracking-tight leading-tight">
               {printVariant.productName} {[printVariant.color, printVariant.size].filter(Boolean).join(' ')}
             </h3>
-            <div ref={printRef} className="label flex flex-col items-center gap-2">
-              <QRCodeCanvas value={printVariant.sku} size={160} />
-              <p style={{ margin: '4px 0', fontSize: '12px', fontWeight: 'bold' }}>{printVariant.productName}</p>
-              {printVariant.color || printVariant.size ? (
-                <p style={{ margin: '4px 0', fontSize: '11px', color: '#666' }}>{printVariant.color} / {printVariant.size}</p>
-              ) : null}
-              {printVariant.price !== undefined ? (
-                <p style={{ margin: '4px 0', fontSize: '12px', fontWeight: 'bold', color: '#000' }}>₹{printVariant.price}</p>
-              ) : null}
-              <p style={{ margin: '4px 0', fontSize: '10px', color: '#999' }}>{printVariant.sku}</p>
+            
+            {/* Visual Canvas Block */}
+            <div className="bg-white p-3 rounded-xl inline-block border border-slate-200">
+              <div ref={printRef} className="label flex flex-col items-center gap-1.5 text-black">
+                <QRCodeCanvas value={printVariant.sku} size={140} />
+                <p style={{ margin: '4px 0 0', fontSize: '11px', fontWeight: 'bold' }}>{printVariant.productName}</p>
+                {printVariant.color || printVariant.size ? (
+                  <p style={{ margin: '0', fontSize: '10px', color: '#555' }}>{printVariant.color} / {printVariant.size}</p>
+                ) : null}
+                {printVariant.price !== undefined ? (
+                  <p style={{ margin: '0', fontSize: '12px', fontWeight: 'bold', color: '#000' }}>₹{printVariant.price}</p>
+                ) : null}
+                <p style={{ margin: '0 0 2px', fontSize: '9px', color: '#777' }}>{printVariant.sku}</p>
+              </div>
             </div>
+
             <div className="flex gap-3">
               <button onClick={printQR}
-                className="flex-1 bg-indigo-600 text-white py-2 rounded-lg font-medium active:scale-95">
-                Print
+                className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl font-bold text-sm active:scale-95 transition-all">
+                Print Label
               </button>
               <button onClick={() => setPrintVariant(null)}
-                className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg font-medium active:scale-95">
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 py-2.5 rounded-xl font-semibold text-sm active:scale-95 transition-all border border-slate-200">
                 Close
               </button>
             </div>

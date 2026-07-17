@@ -43,19 +43,6 @@ export default function ExpensesPage() {
     return supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl
   }
 
-  function updateInventoryAmount() {
-    const total = selectedProducts.reduce((sum, sp) => {
-      const prod = products.find(p => p.id === sp.productId)
-      return sum + (prod ? prod.cost_price * sp.qty : 0)
-    }, 0)
-    setAmount(total > 0 ? String(total) : '')
-    const names = selectedProducts.map(sp => {
-      const prod = products.find(p => p.id === sp.productId)
-      return prod ? `${prod.name} x${sp.qty}` : ''
-    }).filter(Boolean).join(', ')
-    if (names) setDescription('Inventory: ' + names)
-  }
-
   function addProductToExpense(productId: string) {
     setSelectedProducts(prev => {
       const exists = prev.find(sp => sp.productId === productId)
@@ -155,42 +142,51 @@ export default function ExpensesPage() {
   const total = expenses.reduce((sum, e) => sum + e.amount, 0)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-indigo-600 text-white sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+    <div className="min-h-screen bg-slate-50/50 text-slate-900 relative overflow-hidden flex flex-col">
+      {/* Decorative Radial Glowing Backdrops */}
+      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-10 right-1/4 w-[400px] h-[400px] bg-violet-600/5 rounded-full blur-[100px] pointer-events-none" />
+
+      {/* Sticky Header */}
+      <header className="bg-white/80 backdrop-blur-md sticky top-0 z-20 border-b border-slate-200/80">
+        <div className="container mx-auto px-6 py-4 flex justify-between items-center">
           <div>
-            <a href="/admin" className="text-sm opacity-75 hover:opacity-100">← Back</a>
-            <h1 className="text-2xl font-bold">Expenses</h1>
+            <a href="/admin" className="text-xs text-indigo-600 hover:underline flex items-center gap-1 mb-0.5">
+              <span>←</span> Back to Operations
+            </a>
+            <h1 className="text-xl font-extrabold tracking-tight text-slate-900">Expenses Log</h1>
           </div>
           <button
             onClick={() => { if (showForm) resetForm(); else setShowForm(true) }}
-            className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-medium active:scale-95"
+            className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-bold active:scale-95 transition-all shadow-lg shadow-indigo-600/15"
           >
             {showForm ? 'Cancel' : '+ Add Expense'}
           </button>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6">
+      <main className="container mx-auto px-6 py-8 flex-1 max-w-3xl">
         {showForm && (
-          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md mb-6 space-y-3">
+          <form onSubmit={handleSubmit} className="bg-white border border-slate-200/60 p-6 rounded-2xl shadow-xl mb-6 space-y-4">
             {editingExpense && (
-              <p className="text-sm text-indigo-600 font-medium">Editing expense</p>
+              <p className="text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-lg w-fit">
+                Editing expense logs
+              </p>
             )}
 
             {/* Inventory Picker */}
-            <div>
+            <div className="space-y-2 border-b border-slate-100 pb-4">
               <button type="button" onClick={() => setShowProductPicker(!showProductPicker)}
-                className="text-sm text-indigo-600 font-medium mb-2">
-                {showProductPicker ? 'Hide Inventory ▲' : '📦 Add from Inventory'}
+                className="text-xs text-indigo-600 hover:text-indigo-700 font-bold flex items-center gap-1">
+                {showProductPicker ? 'Hide inventory list ▲' : '📦 Add costs from inventory list'}
               </button>
               {showProductPicker && (
-                <div className="border-2 border-gray-200 rounded-lg p-3 max-h-48 overflow-y-auto space-y-1">
+                <div className="border border-slate-200 rounded-xl p-2.5 max-h-48 overflow-y-auto space-y-1 bg-slate-50/50">
                   {products.map(p => (
                     <button type="button" key={p.id} onClick={() => addProductToExpense(p.id)}
-                      className="w-full text-left px-3 py-2 rounded hover:bg-indigo-50 flex justify-between items-center text-sm">
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-indigo-50 flex justify-between items-center text-xs text-slate-700 font-medium">
                       <span>{p.name}</span>
-                      <span className="text-gray-500">₹{p.cost_price}</span>
+                      <span className="text-slate-500 font-semibold">₹{p.cost_price}</span>
                     </button>
                   ))}
                 </div>
@@ -200,9 +196,9 @@ export default function ExpensesPage() {
                   {selectedProducts.map(sp => {
                     const prod = products.find(p => p.id === sp.productId)
                     return prod ? (
-                      <span key={sp.productId} className="bg-indigo-50 text-indigo-700 text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                      <span key={sp.productId} className="bg-indigo-50 text-indigo-600 border border-indigo-100 text-xs px-3 py-1 rounded-full flex items-center gap-1.5 font-semibold">
                         {prod.name} x{sp.qty} (₹{(prod.cost_price * sp.qty).toFixed(0)})
-                        <button type="button" onClick={() => removeProductFromExpense(sp.productId)} className="text-red-500 ml-1">✕</button>
+                        <button type="button" onClick={() => removeProductFromExpense(sp.productId)} className="text-red-500 hover:text-red-600 ml-1">✕</button>
                       </span>
                     ) : null
                   })}
@@ -210,86 +206,118 @@ export default function ExpensesPage() {
               )}
             </div>
 
-            <input type="text" placeholder="Description *" required value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full border-2 border-gray-300 rounded-lg px-4 py-3" />
-            <input type="number" placeholder="Amount *" required step="0.01" value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="w-full border-2 border-gray-300 rounded-lg px-4 py-3" />
-            <input type="text" placeholder="Category (optional)" value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full border-2 border-gray-300 rounded-lg px-4 py-3" />
-            <input type="date" required value={expenseDate}
-              onChange={(e) => setExpenseDate(e.target.value)}
-              className="w-full border-2 border-gray-300 rounded-lg px-4 py-3" />
-            <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)}
-              className="w-full border-2 border-gray-300 rounded-lg px-4 py-3">
-              <option value="Cash">Cash</option>
-              <option value="UPI">UPI</option>
-              <option value="Card">Card</option>
-            </select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1 col-span-1 md:col-span-2">
+                <label className="text-xs font-bold text-slate-500 ml-1">Description</label>
+                <input type="text" placeholder="Description *" required value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 bg-white text-sm focus:outline-none focus:border-indigo-500 text-slate-900" />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 ml-1">Amount (₹)</label>
+                <input type="number" placeholder="Amount *" required step="0.01" value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 bg-white text-sm focus:outline-none focus:border-indigo-500 text-slate-900" />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 ml-1">Category (optional)</label>
+                <input type="text" placeholder="Category (optional)" value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 bg-white text-sm focus:outline-none focus:border-indigo-500 text-slate-900" />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 ml-1">Expense Date</label>
+                <input type="date" required value={expenseDate}
+                  onChange={(e) => setExpenseDate(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 bg-white text-sm focus:outline-none focus:border-indigo-500 text-slate-900" />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 ml-1">Payment Mode</label>
+                <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 bg-white text-sm focus:outline-none focus:border-indigo-500 text-slate-900">
+                  <option value="Cash">Cash</option>
+                  <option value="UPI">UPI</option>
+                  <option value="Card">Card</option>
+                </select>
+              </div>
+            </div>
 
             {/* Image Upload */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Receipt / Bill Image</label>
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-slate-500 ml-1">Receipt / Bill Image</label>
               {existingImage && !imagePreview && (
-                <div className="relative inline-block mb-2">
-                  <img src={existingImage} className="h-20 w-20 object-cover rounded-lg border" />
+                <div className="relative inline-block mb-2 rounded-xl overflow-hidden border border-slate-200">
+                  <img src={existingImage} className="h-20 w-20 object-cover" />
                   <button type="button" onClick={() => setExistingImage(null)}
-                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">✕</button>
+                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">✕</button>
                 </div>
               )}
               {imagePreview && (
-                <div className="relative inline-block mb-2">
-                  <img src={imagePreview} className="h-20 w-20 object-cover rounded-lg border" />
+                <div className="relative inline-block mb-2 rounded-xl overflow-hidden border border-slate-200">
+                  <img src={imagePreview} className="h-20 w-20 object-cover" />
                   <button type="button" onClick={() => { setImageFile(null); setImagePreview(null) }}
-                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">✕</button>
+                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">✕</button>
                 </div>
               )}
               <input type="file" accept="image/*" onChange={(e) => {
                 const file = e.target.files?.[0]
                 if (file) { setImageFile(file); setImagePreview(URL.createObjectURL(file)) }
-              }} className="w-full border-2 border-gray-300 rounded-lg px-4 py-3" />
+              }} className="w-full border border-slate-200 rounded-xl px-4 py-3 bg-white text-sm focus:outline-none file:bg-slate-100 file:border-0 file:text-slate-800 file:px-3 file:py-1 file:rounded-lg file:mr-4 file:text-xs file:font-semibold" />
             </div>
 
-            <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium active:scale-95">
-              {editingExpense ? 'Update Expense' : 'Add Expense'}
+            <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-all shadow-lg shadow-indigo-600/15">
+              {editingExpense ? 'Save Expense Details' : 'Register New Expense'}
             </button>
           </form>
         )}
 
-        <div className="bg-white p-4 rounded-lg shadow mb-4">
-          <p className="text-gray-600 text-sm">Total Expenses</p>
-          <p className="text-3xl font-bold text-red-600">₹{total.toFixed(2)}</p>
+        {/* Total stats panel */}
+        <div className="bg-white border border-slate-200/60 p-5 rounded-2xl shadow-sm flex items-center justify-between mb-6">
+          <div className="space-y-0.5">
+            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Total Business Expenses</p>
+            <p className="text-3xl font-black text-rose-600">₹{total.toFixed(2)}</p>
+          </div>
+          <span className="text-3xl">💸</span>
         </div>
 
-        <div className="space-y-3">
+        {/* List items block */}
+        <div className="space-y-4">
           {expenses.map((expense) => (
-            <div key={expense.id} className="bg-white p-4 rounded-lg shadow flex justify-between items-center">
-              <div className="flex gap-3 items-center">
-                {expense.image_url && (
-                  <img src={expense.image_url} className="w-12 h-12 object-cover rounded-lg border flex-shrink-0 cursor-pointer"
+            <div key={expense.id} className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm hover:border-slate-350 hover:shadow-md transition-all duration-300 p-5 flex justify-between items-center gap-4">
+              <div className="flex gap-4 items-center">
+                {expense.image_url ? (
+                  <img src={expense.image_url} className="w-14 h-14 object-cover rounded-xl border border-slate-100 flex-shrink-0 cursor-pointer hover:opacity-80"
                     onClick={() => window.open(expense.image_url!, '_blank')} />
+                ) : (
+                  <div className="w-14 h-14 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center flex-shrink-0 text-xl">📄</div>
                 )}
-                <div>
-                  <p className="font-bold text-gray-900">{expense.description}</p>
-                  {expense.category && <p className="text-sm text-gray-500">{expense.category}</p>}
-                  <p className="text-sm text-gray-500">{new Date(expense.created_at).toLocaleDateString()} · {expense.payment_mode || 'Cash'}</p>
+                <div className="space-y-1">
+                  <p className="font-extrabold text-sm text-slate-900 tracking-tight leading-tight">{expense.description}</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase">
+                    {expense.category && <span className="text-slate-500 bg-slate-50 border border-slate-200/50 px-2 py-0.5 rounded-full mr-2">{expense.category}</span>}
+                    {expense.payment_mode || 'Cash'} · {new Date(expense.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <p className="text-lg font-bold text-red-600">₹{expense.amount.toFixed(2)}</p>
-                {isAdmin && <button onClick={() => startEdit(expense)} className="text-indigo-600 text-sm">Edit</button>}
-                {isAdmin && <button
-                  onClick={async () => {
-                    if (!confirm('Delete this expense?')) return
-                    await supabase.from('expenses').delete().eq('id', expense.id)
-                    fetchExpenses()
-                  }}
-                  className="text-red-600 active:scale-95"
-                >
-                  ✕
-                </button>}
+                <p className="text-base font-black text-rose-600">₹{expense.amount.toFixed(2)}</p>
+                <div className="flex items-center gap-2">
+                  {isAdmin && <button onClick={() => startEdit(expense)} className="text-xs font-semibold text-indigo-600 hover:underline">Edit</button>}
+                  {isAdmin && <button
+                    onClick={async () => {
+                      if (!confirm('Delete this expense?')) return
+                      await supabase.from('expenses').delete().eq('id', expense.id)
+                      fetchExpenses()
+                    }}
+                    className="text-slate-400 hover:text-red-500 font-bold p-1 transition-colors text-sm"
+                  >
+                    ✕
+                  </button>}
+                </div>
               </div>
             </div>
           ))}

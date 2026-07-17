@@ -58,61 +58,77 @@ export default function CustomersPage() {
   )
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-indigo-600 text-white sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
-          <a href="/admin" className="text-sm opacity-75 hover:opacity-100">← Back</a>
-          <h1 className="text-2xl font-bold">Customers</h1>
+    <div className="min-h-screen bg-slate-50/50 text-slate-900 relative overflow-hidden flex flex-col">
+      {/* Decorative Radial Glowing Backdrops */}
+      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-10 right-1/4 w-[400px] h-[400px] bg-violet-600/5 rounded-full blur-[100px] pointer-events-none" />
+
+      {/* Sticky Header */}
+      <header className="bg-white/80 backdrop-blur-md sticky top-0 z-20 border-b border-slate-200/80">
+        <div className="container mx-auto px-6 py-4">
+          <a href="/admin" className="text-xs text-indigo-600 hover:underline flex items-center gap-1 mb-0.5">
+            <span>←</span> Back to Operations
+          </a>
+          <h1 className="text-xl font-extrabold tracking-tight text-slate-900">Customers Database</h1>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6">
-        <input type="text" placeholder="Search by name or phone..." value={search}
+      <main className="container mx-auto px-6 py-8 flex-1 max-w-3xl">
+        <input 
+          type="text" 
+          placeholder="Search by customer name or phone number..." 
+          value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-full border-2 border-gray-300 rounded-lg px-4 py-3 mb-4" />
+          className="w-full border border-slate-200 rounded-xl px-4 py-3 bg-white focus:outline-none focus:border-indigo-500 text-sm mb-6 shadow-sm placeholder-slate-400" 
+        />
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           {filtered.map(customer => (
-            <div key={customer.id} className="bg-white rounded-lg shadow">
-              <button onClick={() => toggleOrders(customer.id)}
-                className="w-full p-4 text-left active:scale-[0.99]">
+            <div key={customer.id} className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm hover:border-slate-350 hover:shadow-md transition-all duration-300">
+              <button 
+                onClick={() => toggleOrders(customer.id)}
+                className="w-full p-5 text-left active:scale-[0.99] transition-all"
+              >
                 <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="font-bold text-lg text-gray-900">{customer.name}</h3>
-                    <p className="text-gray-600">{customer.phone}</p>
-                    <p className="text-sm text-gray-400">Joined {new Date(customer.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                  <div className="space-y-1">
+                    <h3 className="font-extrabold text-base text-slate-900 tracking-tight">{customer.name}</h3>
+                    <p className="text-xs text-slate-600 font-medium">📞 {customer.phone}</p>
+                    <p className="text-[10px] text-slate-400 font-semibold uppercase">Joined {new Date(customer.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                   </div>
-                  <span className="text-gray-400 text-xl">{expandedId === customer.id ? '▲' : '▼'}</span>
+                  <span className="text-slate-400 font-semibold text-sm bg-slate-100 p-2 rounded-lg hover:bg-slate-200 transition-colors">
+                    {expandedId === customer.id ? 'Hide Orders ▲' : 'View Orders ▼'}
+                  </span>
                 </div>
               </button>
 
               {expandedId === customer.id && (
-                <div className="border-t px-4 pb-4">
+                <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-4 space-y-3">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Order History</h4>
                   {loadingOrders ? (
-                    <p className="text-gray-400 text-sm py-3">Loading orders...</p>
+                    <p className="text-slate-400 text-xs py-3 font-semibold">Loading history logs...</p>
                   ) : orders.length === 0 ? (
-                    <p className="text-gray-400 text-sm py-3">No orders yet</p>
+                    <p className="text-slate-400 text-xs py-3 font-semibold">No transactions recorded yet.</p>
                   ) : (
-                    <div className="divide-y">
+                    <div className="divide-y divide-slate-100 bg-white border border-slate-200/50 rounded-xl overflow-hidden">
                       {orders.map(sale => (
-                        <div key={sale.id} className="py-3">
-                          <div className="flex justify-between items-center mb-1">
-                            <p className="font-bold text-gray-900">₹{sale.total_amount}</p>
-                            <p className="text-xs text-gray-400">
+                        <div key={sale.id} className="p-4 hover:bg-slate-50/20 transition-colors">
+                          <div className="flex justify-between items-center mb-2">
+                            <p className="font-extrabold text-sm text-slate-950">₹{sale.total_amount}</p>
+                            <span className="text-[10px] font-bold bg-indigo-50 border border-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full uppercase">
                               {sale.payment_mode} · {new Date(sale.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                            </p>
+                            </span>
                           </div>
-                          <div className="space-y-0.5">
+                          <div className="space-y-1">
                             {sale.sale_items.map((item, i) => (
-                              <p key={i} className={`text-sm ${item.refunded_qty >= item.quantity ? 'text-red-400 line-through' : 'text-gray-600'}`}>
-                                {(item.product as any)?.name}
-                                {item.variant && <span className="text-indigo-500"> · {(item.variant as any)?.color}/{(item.variant as any)?.size}</span>}
-                                {' '}× {item.quantity} — ₹{(item.unit_price * item.quantity).toFixed(0)}
+                              <p key={i} className={`text-xs ${item.refunded_qty >= item.quantity ? 'text-red-400 line-through' : 'text-slate-600 font-medium'}`}>
+                                📦 {(item.product as any)?.name}
+                                {item.variant && <span className="text-indigo-500 font-semibold"> · {(item.variant as any)?.color}/{(item.variant as any)?.size}</span>}
+                                {' '}× <span className="font-bold text-slate-800">{item.quantity}</span> — ₹{(item.unit_price * item.quantity).toFixed(0)}
                                 {item.refunded_qty > 0 && item.refunded_qty < item.quantity && (
-                                  <span className="text-red-500"> ({item.refunded_qty} refunded)</span>
+                                  <span className="text-red-500 font-bold ml-1"> ({item.refunded_qty} refunded)</span>
                                 )}
                                 {item.refunded_qty >= item.quantity && (
-                                  <span className="text-red-500"> (refunded)</span>
+                                  <span className="text-red-500 font-bold ml-1"> (refunded)</span>
                                 )}
                               </p>
                             ))}

@@ -98,85 +98,128 @@ export default function RefundsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-indigo-600 text-white sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
-          <a href="/admin" className="text-sm opacity-75 hover:opacity-100">← Back</a>
-          <h1 className="text-2xl font-bold">Refunds</h1>
+    <div className="min-h-screen bg-slate-50/50 text-slate-900 relative overflow-hidden flex flex-col">
+      {/* Decorative Radial Glowing Backdrops */}
+      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-10 right-1/4 w-[400px] h-[400px] bg-violet-600/5 rounded-full blur-[100px] pointer-events-none" />
+
+      {/* Sticky Header */}
+      <header className="bg-white/80 backdrop-blur-md sticky top-0 z-20 border-b border-slate-200/80">
+        <div className="container mx-auto px-6 py-4">
+          <a href="/admin" className="text-xs text-indigo-600 hover:underline flex items-center gap-1 mb-0.5">
+            <span>←</span> Back to Operations
+          </a>
+          <h1 className="text-xl font-extrabold tracking-tight text-slate-900">Refund Processing</h1>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 space-y-6">
-        <div className="flex gap-2">
-          <input type="tel" placeholder="Customer Phone" value={phone}
+      <main className="container mx-auto px-6 py-8 flex-1 max-w-2xl space-y-6">
+        <div className="flex gap-3">
+          <input 
+            type="tel" 
+            placeholder="Search customer phone number..." 
+            value={phone}
             onChange={e => setPhone(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && searchSales()}
-            className="flex-1 border-2 border-gray-300 rounded-lg px-4 py-3" />
-          <button onClick={searchSales}
-            className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium active:scale-95">
+            className="flex-1 border border-slate-200 rounded-xl px-4 py-3 bg-white focus:outline-none focus:border-indigo-500 text-sm placeholder-slate-400 text-slate-900" 
+          />
+          <button 
+            onClick={searchSales}
+            className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl font-bold text-sm active:scale-95 transition-all shadow-lg shadow-indigo-600/15"
+          >
             Search
           </button>
         </div>
 
         {sales.length > 0 && !selected && (
-          <div className="space-y-2">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase">Sales for {sales[0]?.customer?.name || phone}</h2>
-            {sales.map(sale => {
-              const allRefunded = sale.sale_items.every(i => i.refunded_qty >= i.quantity)
-              return (
-                <button key={sale.id} onClick={() => !allRefunded && selectSale(sale)}
-                  disabled={allRefunded}
-                  className={`w-full bg-white p-4 rounded-lg shadow text-left active:scale-95 ${allRefunded ? 'opacity-50' : 'hover:shadow-md'}`}>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-bold text-gray-900">₹{sale.total_amount}</p>
-                      <p className="text-sm text-gray-500">{sale.payment_mode} · {sale.sale_items.length} item(s)</p>
+          <div className="space-y-4">
+            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">
+              Sales Records for {sales[0]?.customer?.name || phone}
+            </h2>
+            <div className="space-y-3">
+              {sales.map(sale => {
+                const allRefunded = sale.sale_items.every(i => i.refunded_qty >= i.quantity)
+                return (
+                  <button 
+                    key={sale.id} 
+                    onClick={() => !allRefunded && selectSale(sale)}
+                    disabled={allRefunded}
+                    className={`w-full bg-white border border-slate-200/60 p-5 rounded-2xl text-left active:scale-[0.99] transition-all shadow-sm ${allRefunded ? 'opacity-40 cursor-not-allowed bg-transparent' : 'hover:border-slate-350 hover:shadow-md'}`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div className="space-y-1">
+                        <p className="font-extrabold text-base text-slate-950">₹{sale.total_amount}</p>
+                        <p className="text-xs text-slate-500 font-semibold">{sale.payment_mode} · {sale.sale_items.length} unique items</p>
+                      </div>
+                      <div className="text-right space-y-1">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase">{new Date(sale.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                        {allRefunded && (
+                          <span className="inline-block text-[9px] font-extrabold bg-red-55/60 text-red-600 border border-red-100/50 px-2 py-0.5 rounded-full uppercase">
+                            Fully Refunded
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-400">{new Date(sale.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-                      {allRefunded && <p className="text-xs text-red-500 font-medium">Fully Refunded</p>}
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         )}
 
         {sales.length === 0 && phone && (
-          <p className="text-gray-500 text-center py-8">No sales found for this phone number</p>
+          <div className="text-center py-12 text-slate-400 space-y-2 bg-white rounded-2xl border border-slate-200/50">
+            <span className="text-3xl block">🔍</span>
+            <p className="text-sm font-semibold">No sales found for this customer record</p>
+          </div>
         )}
 
         {selected && (
-          <div className="bg-white p-6 rounded-lg shadow-lg space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-bold text-gray-900">Select Items to Refund</h2>
-              <button onClick={() => setSelected(null)} className="text-sm text-indigo-600 underline">← Back to sales</button>
+          <div className="bg-white border border-slate-200/60 p-6 rounded-2xl shadow-xl space-y-6">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 tracking-tight">Select Items to Refund</h2>
+                <p className="text-xs text-slate-400 font-semibold mt-1">
+                  Sale on {new Date(selected.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} · {selected.payment_mode} · ₹{selected.total_amount}
+                </p>
+              </div>
+              <button onClick={() => setSelected(null)} className="text-xs text-indigo-600 hover:underline font-bold">
+                ← Back to List
+              </button>
             </div>
-            <p className="text-sm text-gray-500">
-              Sale on {new Date(selected.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} · {selected.payment_mode} · ₹{selected.total_amount}
-            </p>
 
-            <div className="divide-y">
+            <div className="divide-y divide-slate-100">
               {selected.sale_items.map(item => {
                 const remaining = item.quantity - item.refunded_qty
                 return (
-                  <div key={item.id} className={`flex justify-between items-center py-3 ${remaining === 0 ? 'opacity-40' : ''}`}>
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">{(item.product as any)?.name}</p>
-                      {item.variant && <p className="text-xs text-indigo-600">{(item.variant as any)?.color} / {(item.variant as any)?.size}</p>}
-                      <p className="text-sm text-gray-500">
+                  <div key={item.id} className={`flex justify-between items-center py-4 ${remaining === 0 ? 'opacity-40' : ''}`}>
+                    <div className="flex-1 space-y-1">
+                      <p className="font-semibold text-slate-900 leading-tight">{(item.product as any)?.name}</p>
+                      {item.variant && (
+                        <span className="inline-flex text-[10px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded-full uppercase">
+                          {(item.variant as any)?.color} / {(item.variant as any)?.size}
+                        </span>
+                      )}
+                      <p className="text-xs text-slate-500">
                         ₹{item.unit_price} × {item.quantity} purchased
-                        {item.refunded_qty > 0 && <span className="text-red-500"> ({item.refunded_qty} already refunded)</span>}
+                        {item.refunded_qty > 0 && <span className="text-red-500 font-bold ml-1"> ({item.refunded_qty} already refunded)</span>}
                       </p>
                     </div>
                     {remaining > 0 && (
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => setRefundQty(p => ({ ...p, [item.id]: Math.max((p[item.id] || 0) - 1, 0) }))}
-                          className="w-8 h-8 bg-gray-200 rounded active:scale-95">-</button>
-                        <span className="w-8 text-center font-bold">{refundQty[item.id] || 0}</span>
-                        <button onClick={() => setRefundQty(p => ({ ...p, [item.id]: Math.min((p[item.id] || 0) + 1, remaining) }))}
-                          className="w-8 h-8 bg-gray-200 rounded active:scale-95">+</button>
+                      <div className="flex items-center gap-2.5">
+                        <button 
+                          onClick={() => setRefundQty(p => ({ ...p, [item.id]: Math.max((p[item.id] || 0) - 1, 0) }))}
+                          className="w-8 h-8 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg flex items-center justify-center font-bold active:scale-90 transition-all border border-slate-200/50"
+                        >
+                          -
+                        </button>
+                        <span className="w-6 text-center font-bold text-sm text-slate-800">{refundQty[item.id] || 0}</span>
+                        <button 
+                          onClick={() => setRefundQty(p => ({ ...p, [item.id]: Math.min((p[item.id] || 0) + 1, remaining) }))}
+                          className="w-8 h-8 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg flex items-center justify-center font-bold active:scale-90 transition-all border border-slate-200/50"
+                        >
+                          +
+                        </button>
                       </div>
                     )}
                   </div>
@@ -184,19 +227,27 @@ export default function RefundsPage() {
               })}
             </div>
 
-            <textarea placeholder="Reason for refund (optional)" value={reason}
+            <textarea 
+              placeholder="Provide a reason for processing this refund (optional)..." 
+              value={reason}
               onChange={e => setReason(e.target.value)}
-              className="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-sm" rows={2} />
+              className="w-full border border-slate-200 rounded-xl px-4 py-3 bg-white text-sm focus:outline-none focus:border-indigo-500 text-slate-900 placeholder-slate-400" 
+              rows={2} 
+            />
 
             {hasRefundItems && (
-              <div className="text-2xl font-bold text-center text-red-600 py-2">
-                Refund: ₹{refundTotal.toFixed(2)}
+              <div className="py-4 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Refund Amount</span>
+                <span className="text-2xl font-black tracking-tight text-rose-600">₹{refundTotal.toFixed(2)}</span>
               </div>
             )}
 
-            <button onClick={processRefund} disabled={!hasRefundItems || loading}
-              className="w-full bg-red-600 text-white py-4 rounded-lg font-bold text-lg active:scale-95 disabled:opacity-50">
-              {loading ? 'Processing...' : 'Process Refund'}
+            <button 
+              onClick={processRefund} 
+              disabled={!hasRefundItems || loading}
+              className="w-full bg-red-650 hover:bg-red-600 text-white py-4 rounded-xl font-bold text-base active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-red-600/15"
+            >
+              {loading ? 'Processing Refund...' : 'Confirm & Process Refund'}
             </button>
           </div>
         )}

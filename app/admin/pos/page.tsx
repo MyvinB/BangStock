@@ -30,7 +30,13 @@ export default function POSPage() {
   const scannerRef = useRef<any>(null)
   const processedRef = useRef(false)
 
-  useEffect(() => { fetchProducts() }, [])
+  const [threshold, setThreshold] = useState(5)
+
+  useEffect(() => {
+    fetchProducts();
+    const saved = parseInt(localStorage?.getItem('bangstock_low_stock_threshold') ?? '5');
+    setThreshold(saved);
+  }, [])
 
   async function fetchProducts() {
     const { data } = await supabase
@@ -76,7 +82,6 @@ export default function POSPage() {
   async function startScan() {
     processedRef.current = false
     setScanning(true)
-    // Wait for video element to mount
     setTimeout(async () => {
       const reader = new BrowserQRCodeReader()
       scannerRef.current = reader
@@ -153,61 +158,103 @@ export default function POSPage() {
     }
   }
 
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase())
-  )
+  const filteredProducts = products.filter(p => {
+    const matchesName = p.name.toLowerCase().includes(search.toLowerCase());
+    const matchesVariant = p.product_variants?.some(v => 
+      (v.color?.toLowerCase() || '').includes(search.toLowerCase()) || 
+      (v.size?.toLowerCase() || '').includes(search.toLowerCase()) ||
+      (v.sku?.toLowerCase() || '').includes(search.toLowerCase())
+    );
+    return matchesName || matchesVariant;
+  })
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-indigo-600 text-white sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
-          <a href="/admin" className="text-sm opacity-75 hover:opacity-100">← Back</a>
-          <h1 className="text-2xl font-bold">Point of Sale</h1>
+    <div className="min-h-screen bg-slate-50/50 text-slate-900 relative overflow-hidden flex flex-col">
+      {/* Decorative Radial Glowing Backdrops */}
+      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-10 right-1/4 w-[400px] h-[400px] bg-violet-600/5 rounded-full blur-[100px] pointer-events-none" />
+      
+      {/* Sticky Header */}
+      <header className="bg-white/80 backdrop-blur-md sticky top-0 z-20 border-b border-slate-200/80">
+        <div className="container mx-auto px-6 py-4 flex justify-between items-center">
+          <div>
+            <a href="/admin" className="text-xs text-indigo-600 hover:underline flex items-center gap-1 mb-0.5">
+              <span>←</span> Back to Operations
+            </a>
+            <h1 className="text-xl font-extrabold tracking-tight text-slate-900">Point of Sale</h1>
+          </div>
+          <div className="text-xs text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200/50">
+            📠 Drawer Connected
+          </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6">
-        <div className="grid lg:grid-cols-2 gap-6">
+      <main className="container mx-auto px-6 py-8 flex-1">
+        <div className="grid lg:grid-cols-2 gap-8">
 
-          {/* Products */}
-          <div>
-            <div className="flex gap-2 mb-4">
-              <input type="text" placeholder="Search products..." value={search}
+          {/* Products Pane */}
+          <div className="space-y-6">
+            <div className="flex gap-3">
+              <input 
+                type="text" 
+                placeholder="Search products..." 
+                value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="flex-1 border-2 border-gray-300 rounded-lg px-4 py-3" />
-              <button onClick={scanning ? stopScan : startScan}
-                className={`px-4 py-3 rounded-lg font-medium active:scale-95 ${scanning ? 'bg-red-500 text-white' : 'bg-indigo-600 text-white'}`}>
+                className="flex-1 border border-slate-200 bg-white text-slate-900 placeholder-slate-450 rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500" 
+              />
+              <button 
+                onClick={scanning ? stopScan : startScan}
+                className={`px-6 py-3 rounded-xl font-semibold active:scale-95 transition-all duration-200 flex items-center gap-1.5 shadow-lg ${scanning ? 'bg-red-600 hover:bg-red-500 text-white shadow-red-600/10' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/15'}`}
+              >
                 {scanning ? '✕ Stop' : '📷 Scan'}
               </button>
             </div>
 
             {/* QR Scanner */}
             {scanning && (
-              <div className="mb-4 rounded-lg overflow-hidden border-2 border-indigo-400">
-                <video ref={videoRef} className="w-full" />
-                <p className="text-center text-sm text-gray-500 py-2">Point camera at QR code</p>
+              <div className="rounded-xl overflow-hidden border border-indigo-500/20 bg-white relative shadow-xl">
+                <video ref={videoRef} className="w-full animate-pulse" />
+                <div className="absolute inset-0 border-[3px] border-indigo-500/10 pointer-events-none rounded-xl" />
+                <p className="text-center text-xs text-slate-500 py-3 bg-slate-50 border-t border-slate-100">
+                  Point camera at QR code label
+                </p>
               </div>
             )}
 
-            <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+            <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1">
               {filteredProducts.map((product) => (
-                <button key={product.id} onClick={() => handleProductClick(product)}
-                  className="w-full bg-white p-4 rounded-lg shadow text-left hover:shadow-md active:scale-95">
-                  <div className="flex gap-3 items-center">
+                <button 
+                  key={product.id} 
+                  onClick={() => handleProductClick(product)}
+                  className="w-full bg-white border border-slate-200/60 hover:border-slate-350 hover:bg-slate-50/30 p-4 rounded-xl text-left hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200 shadow-sm"
+                >
+                  <div className="flex gap-4 items-center">
                     {product.image_url ? (
-                      <img src={product.image_url} alt={product.name} className="w-12 h-12 object-cover rounded-lg flex-shrink-0" />
+                      <img src={product.image_url} alt={product.name} className="w-14 h-14 object-cover rounded-xl flex-shrink-0 border border-slate-100" />
                     ) : (
-                      <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0 text-xl">📦</div>
+                      <div className="w-14 h-14 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center flex-shrink-0 text-2xl">📦</div>
                     )}
                     <div className="flex-1 flex justify-between items-center">
                       <div>
-                        <h3 className="font-bold text-gray-900">{product.name}</h3>
-                        <p className="text-sm text-gray-500">
-                          Stock: {product.stock_quantity}
-                          {product.product_variants?.length > 0 && ` · ${product.product_variants.length} variants`}
+                        <div className="flex items-center gap-1">
+                          <h3 className="font-bold text-slate-900 tracking-tight">{product.name}</h3>
+                          {product.stock_quantity <= threshold && (
+                            <span className="text-[9px] font-extrabold bg-amber-50 text-amber-600 border border-amber-100 px-2 py-0.5 rounded-full uppercase select-none">
+                              Low Stock ({product.stock_quantity})
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Stock: <span className="font-semibold text-slate-700">{product.stock_quantity}</span>
+                          {product.product_variants?.length > 0 && (
+                            <>
+                              <span className="mx-1.5 opacity-30">•</span>
+                              <span>{product.product_variants.length} variations</span>
+                            </>
+                          )}
                         </p>
                       </div>
-                      <p className="text-lg font-bold text-indigo-600">₹{product.selling_price}</p>
+                      <p className="text-lg font-black text-indigo-600">₹{product.selling_price}</p>
                     </div>
                   </div>
                 </button>
@@ -215,106 +262,205 @@ export default function POSPage() {
             </div>
           </div>
 
-          {/* Cart */}
-          {/* Mobile: show cart toggle button */}
-          {cart.length > 0 && (
-            <button onClick={() => {
-              const el = document.getElementById('pos-cart')
-              el?.scrollIntoView({ behavior: 'smooth' })
-            }}
-              className="lg:hidden fixed bottom-4 right-4 z-20 bg-green-600 text-white px-5 py-3 rounded-full shadow-lg font-bold text-lg active:scale-95">
-              🛒 {cart.reduce((s, i) => s + i.quantity, 0)} · ₹{total.toFixed(0)}
-            </button>
-          )}
-          <div id="pos-cart" className="bg-white p-6 rounded-lg shadow-lg lg:sticky lg:top-24 h-fit">
-            <h2 className="text-xl font-bold mb-4">Cart</h2>
-            {cart.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">Cart is empty</p>
-            ) : (
-              <>
-                <div className="space-y-3 mb-4">
-                  {cart.map((item) => (
-                    <div key={item.key} className="flex justify-between items-center border-b pb-3">
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900">{item.product.name}</p>
-                        {item.variant && (
-                          <p className="text-xs text-indigo-600">{item.variant.color} / {item.variant.size}</p>
-                        )}
-                        <p className="text-sm text-gray-500">₹{item.product.selling_price} each</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => updateQuantity(item.key, item.quantity - 1)}
-                          className="w-8 h-8 bg-gray-200 rounded active:scale-95">-</button>
-                        <span className="w-8 text-center font-bold">{item.quantity}</span>
-                        <button onClick={() => updateQuantity(item.key, item.quantity + 1)}
-                          className="w-8 h-8 bg-gray-200 rounded active:scale-95">+</button>
-                        <button onClick={() => updateQuantity(item.key, 0)}
-                          className="ml-2 text-red-500 active:scale-95">✕</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+          {/* Cart Pane */}
+          <div className="space-y-6">
+            {/* Mobile Sticky Tab button */}
+            {cart.length > 0 && (
+              <button 
+                onClick={() => {
+                  const el = document.getElementById('pos-cart')
+                  el?.scrollIntoView({ behavior: 'smooth' })
+                }}
+                className="lg:hidden fixed bottom-6 right-6 z-30 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3.5 rounded-full shadow-2xl font-bold flex items-center gap-2 active:scale-95 transition-all shadow-indigo-600/20"
+              >
+                🛒 {cart.reduce((s, i) => s + i.quantity, 0)} items · ₹{total.toFixed(0)}
+              </button>
+            )}
 
-                <div className="border-t pt-4 space-y-3">
-                  <div className="flex gap-2">
-                    <span className="border-2 border-gray-300 rounded-lg px-3 py-3 bg-gray-100 text-gray-600">+91</span>
-                    <input type="tel" placeholder="Customer Phone *" value={customerPhone}
-                      onChange={(e) => onPhoneChange(e.target.value)}
-                      className="flex-1 border-2 border-gray-300 rounded-lg px-4 py-3" />
-                  </div>
-                  <input type="text" placeholder="Customer Name (optional)" value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full border-2 border-gray-300 rounded-lg px-4 py-3" />
-                  <div className="flex gap-2">
-                    {PAYMENT_MODES.map((mode) => (
-                      <button key={mode} onClick={() => setPaymentMode(mode)}
-                        className={`flex-1 py-3 rounded-lg font-medium ${paymentMode === mode ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}`}>
-                        {mode}
-                      </button>
+            <div id="pos-cart" className="bg-white border border-slate-200/60 p-6 rounded-2xl shadow-xl lg:sticky lg:top-24 h-fit space-y-6">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <h2 className="text-lg font-bold tracking-tight text-slate-900">Shopping Cart</h2>
+                <span className="text-xs text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-100">
+                  {cart.length} unique items
+                </span>
+              </div>
+
+              {cart.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 space-y-2">
+                  <span className="text-3xl block">🛒</span>
+                  <p className="text-sm font-semibold">No items added to sale yet</p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-4 max-h-[30vh] overflow-y-auto pr-1">
+                    {cart.map((item) => (
+                      <div key={item.key} className="flex justify-between items-center border-b border-slate-100 pb-4">
+                        <div className="flex-1 space-y-1 pr-4">
+                          <p className="font-semibold text-slate-900 leading-tight">{item.product.name}</p>
+                          {item.variant && (
+                            <span className="inline-flex text-[10px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded-full uppercase">
+                              {item.variant.color} / {item.variant.size}
+                            </span>
+                          )}
+                          <p className="text-xs text-slate-500">₹{item.product.selling_price} each</p>
+                        </div>
+                        <div className="flex items-center gap-2.5">
+                          <button 
+                            onClick={() => updateQuantity(item.key, item.quantity - 1)}
+                            className="w-8 h-8 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg flex items-center justify-center font-bold active:scale-90 transition-all border border-slate-200/50"
+                          >
+                            -
+                          </button>
+                          <span className="w-6 text-center font-bold text-sm text-slate-800">{item.quantity}</span>
+                          <button 
+                            onClick={() => updateQuantity(item.key, item.quantity + 1)}
+                            className="w-8 h-8 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg flex items-center justify-center font-bold active:scale-90 transition-all border border-slate-200/50"
+                          >
+                            +
+                          </button>
+                          <button 
+                            onClick={() => updateQuantity(item.key, 0)}
+                            className="ml-1 text-slate-400 hover:text-red-500 transition-colors p-1"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
                     ))}
                   </div>
-                  <div className="text-right text-sm text-gray-500">Subtotal: ₹{subtotal.toFixed(2)}</div>
-                  <div className="flex items-center gap-2">
-                    <input type="number" placeholder="Custom Total / Sale Amount (₹)" min="0" max={subtotal} value={customTotal}
-                      onChange={(e) => setCustomTotal(e.target.value)}
-                      className="flex-1 border-2 border-gray-300 rounded-lg px-4 py-3" />
-                    {discountAmt > 0 && (
-                      <span className="text-sm text-red-500 font-medium flex flex-col items-end whitespace-nowrap">
-                        <span className="text-xs text-gray-500">({discountPct.toFixed(1)}% off)</span>
-                        <span>-₹{discountAmt.toFixed(2)}</span>
-                      </span>
-                    )}
+
+                  <div className="space-y-4 pt-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="flex">
+                        <span className="border border-slate-200 border-r-0 bg-slate-50 text-slate-500 rounded-l-xl px-3.5 flex items-center text-sm font-semibold select-none">
+                          +91
+                        </span>
+                        <input 
+                          type="tel" 
+                          placeholder="Phone *" 
+                          value={customerPhone}
+                          onChange={(e) => onPhoneChange(e.target.value)}
+                          className="flex-1 border border-slate-200 rounded-r-xl px-4 py-3 bg-white focus:outline-none focus:border-indigo-500 text-sm text-slate-900" 
+                        />
+                      </div>
+                      <input 
+                        type="text" 
+                        placeholder="Customer Name (optional)" 
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        className="w-full border border-slate-200 rounded-xl px-4 py-3 bg-white focus:outline-none focus:border-indigo-500 text-sm text-slate-900" 
+                      />
+                    </div>
+
+                    <div className="flex gap-2">
+                      {PAYMENT_MODES.map((mode) => (
+                        <button 
+                          key={mode} 
+                          onClick={() => setPaymentMode(mode)}
+                          className={`flex-1 py-3 rounded-xl font-semibold text-sm transition-all duration-200 ${paymentMode === mode ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'bg-slate-100 text-slate-700 border border-slate-200/50 hover:bg-slate-200'}`}
+                        >
+                          {mode}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="border-t border-slate-100 pt-4 space-y-2.5">
+                      <div className="flex justify-between items-center text-xs text-slate-500">
+                        <span>Original Subtotal</span>
+                        <span>₹{subtotal.toFixed(2)}</span>
+                      </div>
+
+                      {/* Quick Discount Shortcuts */}
+                      <div className="flex gap-2 flex-wrap mb-3.5">
+                        <button type="button" onClick={() => setCustomTotal((subtotal * 0.95).toFixed(2))}
+                          className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg font-bold border border-slate-200/50">
+                          5% Off
+                        </button>
+                        <button type="button" onClick={() => setCustomTotal((subtotal * 0.90).toFixed(2))}
+                          className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg font-bold border border-slate-200/50">
+                          10% Off
+                        </button>
+                        <button type="button" onClick={() => setCustomTotal(Math.max(0, subtotal - 100).toFixed(2))}
+                          className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg font-bold border border-slate-200/50">
+                          ₹100 Off
+                        </button>
+                        <button type="button" onClick={() => setCustomTotal(Math.max(0, subtotal - 500).toFixed(2))}
+                          className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg font-bold border border-slate-200/50">
+                          ₹500 Off
+                        </button>
+                        {customTotal !== '' && (
+                          <button type="button" onClick={() => setCustomTotal('')}
+                            className="bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs px-2.5 py-1.5 rounded-lg font-bold border border-rose-100/50">
+                            Reset
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <input 
+                          type="number" 
+                          placeholder="Custom checkout total amount (₹)" 
+                          min="0" 
+                          max={subtotal} 
+                          value={customTotal}
+                          onChange={(e) => setCustomTotal(e.target.value)}
+                          className="flex-1 border border-slate-200 rounded-xl px-4 py-3 bg-white focus:outline-none focus:border-indigo-500 text-sm text-slate-900" 
+                        />
+                        {discountAmt > 0 && (
+                          <div className="text-right whitespace-nowrap">
+                            <span className="block text-[10px] text-red-500 font-bold">-{discountPct.toFixed(1)}% OFF</span>
+                            <span className="text-xs text-red-500 font-semibold">-₹{discountAmt.toFixed(2)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="py-4 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-slate-500 font-medium">Final Amount</span>
+                      <span className="text-2xl font-black tracking-tight text-emerald-600">₹{total.toFixed(2)}</span>
+                    </div>
+
+                    <button 
+                      onClick={completeSale}
+                      className="w-full bg-green-600 hover:bg-green-500 text-white py-4 rounded-xl font-bold text-base active:scale-[0.98] transition-all shadow-lg shadow-green-600/15"
+                    >
+                      Complete & Print Receipt
+                    </button>
                   </div>
-                  <div className="text-2xl font-bold text-center py-4">Total: ₹{total.toFixed(2)}</div>
-                  <button onClick={completeSale}
-                    className="w-full bg-green-600 text-white py-4 rounded-lg font-bold text-lg active:scale-95">
-                    Complete Sale
-                  </button>
-                </div>
-              </>
-            )}
+                </>
+              )}
+            </div>
           </div>
         </div>
       </main>
 
       {/* Variant Picker Modal */}
       {variantPicker && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50">
-          <div className="bg-white rounded-t-2xl p-6 w-full max-w-lg">
-            <h3 className="font-bold text-lg text-gray-900 mb-4">{variantPicker.name} — Select Variant</h3>
-            <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-end justify-center z-50 transition-all duration-300">
+          <div className="bg-white border border-slate-200 rounded-t-2xl p-6 w-full max-w-lg space-y-4">
+            <div className="space-y-1">
+              <h3 className="font-extrabold text-lg tracking-tight text-slate-900">{variantPicker.name}</h3>
+              <p className="text-xs text-slate-500">Select size and color dimension</p>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-1">
               {variantPicker.product_variants.map(v => (
-                <button key={v.id}
+                <button 
+                  key={v.id}
                   disabled={v.stock_quantity === 0}
                   onClick={() => { addToCart(variantPicker, v); setVariantPicker(null) }}
-                  className={`p-3 rounded-lg border-2 text-left active:scale-95 ${v.stock_quantity === 0 ? 'opacity-40 cursor-not-allowed border-gray-200' : 'border-indigo-200 hover:border-indigo-500'}`}>
-                  <p className="font-medium text-gray-900">{v.color} / {v.size}</p>
-                  <p className="text-xs text-gray-500">{v.stock_quantity} in stock</p>
+                  className={`p-4 rounded-xl border text-left active:scale-[0.98] transition-all duration-200 flex flex-col justify-between h-20 ${v.stock_quantity === 0 ? 'opacity-30 cursor-not-allowed bg-transparent border-slate-100' : 'bg-slate-50 border-slate-200 hover:border-indigo-500/50 hover:bg-indigo-50'}`}
+                >
+                  <p className="font-bold text-slate-800 text-sm uppercase tracking-wider">{v.color} / {v.size}</p>
+                  <p className="text-xs text-slate-500 font-semibold">{v.stock_quantity} units available</p>
                 </button>
               ))}
             </div>
-            <button onClick={() => setVariantPicker(null)}
-              className="mt-4 w-full bg-gray-200 text-gray-700 py-3 rounded-lg font-medium active:scale-95">
+            
+            <button 
+              onClick={() => setVariantPicker(null)}
+              className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 py-3 rounded-xl font-semibold text-sm active:scale-95 transition-all border border-slate-200"
+            >
               Cancel
             </button>
           </div>
