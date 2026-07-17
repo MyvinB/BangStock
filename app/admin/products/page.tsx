@@ -17,9 +17,23 @@ export default function ProductsPage() {
   const [showForm, setShowForm] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [printVariant, setPrintVariant] = useState<{ sku: string; name: string } | null>(null)
-  const [bulkQR, setBulkQR] = useState<{ sku: string; name: string; qty: number }[]>([])
+  const [printVariant, setPrintVariant] = useState<{
+    sku: string;
+    productName: string;
+    color?: string;
+    size?: string;
+    price?: number;
+  } | null>(null)
+  const [bulkQR, setBulkQR] = useState<{
+    sku: string;
+    productName: string;
+    color?: string;
+    size?: string;
+    price?: number;
+    qty: number;
+  }[]>([])
   const [editingStock, setEditingStock] = useState<{ id: string; value: string } | null>(null)
+  const [bulkPrintMode, setBulkPrintMode] = useState(false)
   const printRef = useRef<HTMLDivElement>(null)
 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
@@ -86,6 +100,16 @@ export default function ProductsPage() {
 
   function removeVariant(index: number) {
     setVariants(prev => prev.filter((_, i) => i !== index))
+  }
+
+  function duplicateVariant(index: number) {
+    setVariants(prev => {
+      const updated = [...prev]
+      const original = updated[index]
+      const duplicated = { ...original, sku: '' }
+      updated.splice(index + 1, 0, duplicated)
+      return updated
+    })
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -259,7 +283,14 @@ export default function ProductsPage() {
   function printQR() {
     if (!printVariant) return
     if (isWebUSBSupported()) {
-      printLabel(printVariant.name, printVariant.sku).then(() => {
+      printLabel(
+        printVariant.productName,
+        printVariant.sku,
+        1,
+        printVariant.color,
+        printVariant.size,
+        printVariant.price
+      ).then(() => {
         setPrintVariant(null)
       }).catch(err => {
         alert('Print failed: ' + err.message + '. Falling back to browser print.')
@@ -275,23 +306,29 @@ export default function ProductsPage() {
     if (!canvas) return
     const imgData = canvas.toDataURL('image/png')
     const win = window.open('', '_blank')
+    const truncatedName = printVariant ? (printVariant.productName.length > 22 ? printVariant.productName.slice(0, 22) + '..' : printVariant.productName) : ''
+    const variantText = printVariant ? [printVariant.color, printVariant.size].filter(Boolean).join(' / ') : ''
     win?.document.write(`
       <html><head><title>Print QR</title>
       <style>
         @page { size: 45mm 25mm; margin: 0; }
         body { margin:0; padding:0; font-family:sans-serif; }
-        .label { width:45mm; height:25mm; display:flex; align-items:center; padding:1.5mm 2mm; box-sizing:border-box; gap:2mm; }
+        .label { width:45mm; height:25mm; display:flex; align-items:center; padding:1mm 1.5mm; box-sizing:border-box; gap:1.5mm; }
         .label img { width:20mm; height:20mm; flex-shrink:0; }
-        .label .info { flex:1; overflow:hidden; }
-        .label .info p { margin:0; line-height:1.2; }
-        .label .info .name { font-size:7pt; font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .label .info .sku { font-size:6pt; color:#444; }
+        .label .info { flex:1; overflow:hidden; display:flex; flex-direction:column; justify-content:center; }
+        .label .info p { margin:0; line-height:1.25; }
+        .label .info .name { font-size:7pt; font-weight:bold; }
+        .label .info .variant { font-size:5.5pt; color:#555; }
+        .label .info .price { font-size:7.5pt; font-weight:bold; color:#000; margin: 0.5mm 0; }
+        .label .info .sku { font-size:5.5pt; color:#444; }
       </style></head>
       <body>
         <div class="label">
           <img src="${imgData}" />
           <div class="info">
-            <p class="name">${printVariant?.name}</p>
+            <p class="name">${truncatedName}</p>
+            ${variantText ? `<p class="variant">${variantText}</p>` : ''}
+            ${printVariant?.price !== undefined ? `<p class="price">₹${printVariant.price}</p>` : ''}
             <p class="sku">${printVariant?.sku}</p>
           </div>
         </div>
@@ -301,8 +338,22 @@ export default function ProductsPage() {
     win?.document.close()
   }
 
-  function toggleBulkQR(sku: string, name: string, qty: number) {
-    setBulkQR(prev => qty <= 0 ? prev.filter(q => q.sku !== sku) : prev.some(q => q.sku === sku) ? prev.map(q => q.sku === sku ? { ...q, qty } : q) : [...prev, { sku, name, qty }])
+  function toggleBulkQR(
+    sku: string,
+    productName: string,
+    qty: number,
+    color?: string,
+    size?: string,
+    price?: number
+  ) {
+    setBulkQR(prev => {
+      if (qty <= 0) return prev.filter(q => q.sku !== sku)
+      const existing = prev.find(q => q.sku === sku)
+      if (existing) {
+        return prev.map(q => q.sku === sku ? { ...q, qty } : q)
+      }
+      return [...prev, { sku, productName, qty, color, size, price }]
+    })
   }
 
   function printBulkQR() {
@@ -310,7 +361,14 @@ export default function ProductsPage() {
       (async () => {
         try {
           for (const item of bulkQR) {
-            await printLabel(item.name, item.sku, item.qty)
+            await printLabel(
+              item.productName,
+              item.sku,
+              item.qty,
+              item.color,
+              item.size,
+              item.price
+            )
           }
           setBulkQR([])
         } catch (err: any) {
@@ -330,23 +388,43 @@ export default function ProductsPage() {
     const labels: string[] = []
     bulkQR.forEach((item, i) => {
       const imgData = canvases[i]?.toDataURL('image/png')
+      const truncatedName = item.productName.length > 22 ? item.productName.slice(0, 22) + '..' : item.productName
+      const variantText = [item.color, item.size].filter(Boolean).join(' / ')
+
       for (let n = 0; n < item.qty; n++) {
-        labels.push(`<div class="label"><img src="${imgData}"/><div class="info"><p class="name">${item.name}</p><p class="sku">${item.sku}</p></div></div>`)
+        labels.push(`
+          <div class="label">
+            <img src="${imgData}" />
+            <div class="info">
+              <p class="name">${truncatedName}</p>
+              ${variantText ? `<p class="variant">${variantText}</p>` : ''}
+              ${item.price !== undefined ? `<p class="price">₹${item.price}</p>` : ''}
+              <p class="sku">${item.sku}</p>
+            </div>
+          </div>
+        `)
       }
     })
     const win = window.open('', '_blank')
     win?.document.write(`<html><head><title>Bulk QR Print</title><style>
       @page { size: 45mm 25mm; margin: 0; }
       body{margin:0;padding:0;font-family:sans-serif}
-      .label{width:45mm;height:25mm;display:flex;align-items:center;padding:1.5mm 2mm;box-sizing:border-box;gap:2mm;page-break-after:always}
+      .label{width:45mm;height:25mm;display:flex;align-items:center;padding:1mm 1.5mm;box-sizing:border-box;gap:1.5mm;page-break-after:always}
       .label img{width:20mm;height:20mm;flex-shrink:0}
-      .label .info{flex:1;overflow:hidden}
-      .label .info p{margin:0;line-height:1.2}
+      .label .info{flex:1;overflow:hidden;display:flex;flex-direction:column;justify-content:center;}
+      .label .info p{margin:0;line-height:1.25}
       .label .info .name{font-size:7pt;font-weight:bold}
-      .label .info .sku{font-size:6pt;color:#444}
+      .label .info .variant{font-size:5.5pt;color:#555;}
+      .label .info .price{font-size:7.5pt;font-weight:bold;color:#000;margin:0.5mm 0;}
+      .label .info .sku{font-size:5.5pt;color:#444}
     </style></head><body>${labels.join('')}<script>window.onload=()=>window.print()<\/script></body></html>`)
     win?.document.close()
   }
+
+  const dynamicColors = Array.from(new Set([
+    ...COLORS,
+    ...products.flatMap(p => p.product_variants || []).map(v => v.color).filter(Boolean)
+  ])).sort()
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -363,11 +441,24 @@ export default function ProductsPage() {
                 🔌 Printer
               </button>
             )}
+            <button onClick={() => {
+              setBulkPrintMode(!bulkPrintMode);
+              if (bulkPrintMode) setBulkQR([]); // Clear selection when turning off print mode
+            }}
+              className={`px-4 py-2 rounded-lg text-sm font-medium active:scale-95 transition-colors ${bulkPrintMode ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-white text-indigo-600'}`}>
+              {bulkPrintMode ? '✕ Exit Print Mode' : '🖨 Bulk Print Mode'}
+            </button>
             {bulkQR.length > 0 && (
-              <button onClick={printBulkQR}
-                className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-medium active:scale-95">
-                🖨 Print {bulkQR.reduce((s, q) => s + q.qty, 0)} QR
-              </button>
+              <div className="flex gap-2">
+                <button onClick={() => setBulkQR([])}
+                  className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-medium active:scale-95">
+                  ✕ Clear All
+                </button>
+                <button onClick={printBulkQR}
+                  className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-medium active:scale-95">
+                  🖨 Print {bulkQR.reduce((s, q) => s + q.qty, 0)} QR
+                </button>
+              </div>
             )}
             <button onClick={() => { if (showForm) resetForm(); else { setEditingProduct(null); setShowForm(true) } }}
               className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-medium active:scale-95">
@@ -471,15 +562,23 @@ export default function ProductsPage() {
                       className="border-2 border-gray-300 rounded-lg px-3 py-2 text-sm">
                       {SIZES.map(s => <option key={s}>{s}</option>)}
                     </select>
-                    <select value={v.color} onChange={(e) => updateVariant(i, 'color', e.target.value)}
-                      className="border-2 border-gray-300 rounded-lg px-3 py-2 text-sm">
-                      {COLORS.map(c => <option key={c}>{c}</option>)}
-                    </select>
+                     <div>
+                       <input type="text" placeholder="Color *" list={`colors-${i}`} value={v.color}
+                         onChange={(e) => updateVariant(i, 'color', e.target.value)}
+                         className="w-full border-2 border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                       <datalist id={`colors-${i}`}>
+                         {dynamicColors.map(c => <option key={c} value={c} />)}
+                       </datalist>
+                     </div>
                     <input type="number" placeholder="Stock" min="0" value={v.stock_quantity === 0 ? '' : v.stock_quantity}
                       onChange={(e) => updateVariant(i, 'stock_quantity', e.target.value === '' ? 0 : parseInt(e.target.value))}
                       className="border-2 border-gray-300 rounded-lg px-3 py-2 text-sm" />
-                    <button type="button" onClick={() => removeVariant(i)}
-                      className="text-red-500 text-sm">Remove</button>
+                     <div className="flex gap-2 text-sm">
+                       <button type="button" onClick={() => duplicateVariant(i)}
+                         className="text-indigo-600 font-medium hover:underline">Duplicate</button>
+                       <button type="button" onClick={() => removeVariant(i)}
+                         className="text-red-500 hover:underline">Remove</button>
+                     </div>
                   </div>
                 ))}
               </div>
@@ -498,6 +597,31 @@ export default function ProductsPage() {
             <div key={product.id} className="bg-white rounded-lg shadow overflow-hidden">
               {/* Product Row */}
               <div className="p-4 flex gap-4 items-center">
+                {/* Product Checkbox (Select all variants for bulk QR) */}
+                {bulkPrintMode && product.product_variants?.length > 0 && (
+                  <input type="checkbox"
+                    checked={product.product_variants.every(v => bulkQR.some(q => q.sku === v.sku))}
+                    onChange={(e) => {
+                      const skus = product.product_variants.map(v => v.sku);
+                      if (e.target.checked) {
+                        setBulkQR(prev => {
+                          const filtered = prev.filter(q => !skus.includes(q.sku));
+                          const newItems = product.product_variants.map(v => ({
+                            sku: v.sku,
+                            productName: product.name,
+                            qty: 1,
+                            color: v.color,
+                            size: v.size,
+                            price: product.selling_price
+                          }));
+                          return [...filtered, ...newItems];
+                        });
+                      } else {
+                        setBulkQR(prev => prev.filter(q => !skus.includes(q.sku)));
+                      }
+                    }}
+                    className="w-5 h-5 rounded text-indigo-600 border-gray-300 focus:ring-indigo-500 cursor-pointer flex-shrink-0" />
+                )}
                 {/* Image */}
                 <label className="cursor-pointer flex-shrink-0 relative group">
                   {product.image_url ? (
@@ -579,14 +703,44 @@ export default function ProductsPage() {
                                 {v.stock_quantity} in stock
                               </button>
                             )}
-                            <button onClick={() => setPrintVariant({ sku: v.sku, name: `${product.name} ${v.color} ${v.size}` })}
+                            <button onClick={() => setPrintVariant({
+                              sku: v.sku,
+                              productName: product.name,
+                              color: v.color,
+                              size: v.size,
+                              price: product.selling_price
+                            })}
                               className="text-xs bg-indigo-600 text-white px-2 py-1 rounded active:scale-95">
                               🖨 Print QR
                             </button>
-                            <input type="number" min="0" placeholder="Qty"
-                              value={bulkQR.find(q => q.sku === v.sku)?.qty || ''}
-                              onChange={(e) => toggleBulkQR(v.sku, `${product.name} ${v.color} ${v.size}`, parseInt(e.target.value) || 0)}
-                              className="w-14 border-2 border-gray-300 rounded px-1 py-0.5 text-xs text-center" />
+                             {bulkPrintMode && (
+                               <div className="flex items-center gap-1.5 border-l pl-3 ml-1 border-gray-200">
+                                 <input type="checkbox"
+                                   id={`bulk-check-${v.sku}`}
+                                   checked={bulkQR.some(q => q.sku === v.sku)}
+                                   onChange={(e) => {
+                                     if (e.target.checked) {
+                                       toggleBulkQR(v.sku, product.name, 1, v.color, v.size, product.selling_price)
+                                     } else {
+                                       toggleBulkQR(v.sku, product.name, 0)
+                                     }
+                                   }}
+                                   className="w-4 h-4 rounded text-indigo-600 border-gray-300 focus:ring-indigo-500 cursor-pointer" />
+                                 {bulkQR.some(q => q.sku === v.sku) && (
+                                   <input type="number" min="1" placeholder="Qty"
+                                     value={bulkQR.find(q => q.sku === v.sku)?.qty || 1}
+                                     onChange={(e) => toggleBulkQR(
+                                       v.sku,
+                                       product.name,
+                                       parseInt(e.target.value) || 1,
+                                       v.color,
+                                       v.size,
+                                       product.selling_price
+                                     )}
+                                     className="w-12 border-2 border-gray-300 rounded px-1 py-0.5 text-xs text-center" />
+                                 )}
+                               </div>
+                             )}
                           </div>
                         </div>
                       ))}
@@ -605,11 +759,19 @@ export default function ProductsPage() {
       {printVariant && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 text-center space-y-4 w-72">
-            <h3 className="font-bold text-gray-900">{printVariant.name}</h3>
+            <h3 className="font-bold text-gray-900">
+              {printVariant.productName} {[printVariant.color, printVariant.size].filter(Boolean).join(' ')}
+            </h3>
             <div ref={printRef} className="label flex flex-col items-center gap-2">
               <QRCodeCanvas value={printVariant.sku} size={160} />
-              <p style={{margin:'4px 0', fontSize:'12px', fontWeight:'bold'}}>{printVariant.name}</p>
-              <p style={{margin:'4px 0', fontSize:'11px', color:'#666'}}>{printVariant.sku}</p>
+              <p style={{ margin: '4px 0', fontSize: '12px', fontWeight: 'bold' }}>{printVariant.productName}</p>
+              {printVariant.color || printVariant.size ? (
+                <p style={{ margin: '4px 0', fontSize: '11px', color: '#666' }}>{printVariant.color} / {printVariant.size}</p>
+              ) : null}
+              {printVariant.price !== undefined ? (
+                <p style={{ margin: '4px 0', fontSize: '12px', fontWeight: 'bold', color: '#000' }}>₹{printVariant.price}</p>
+              ) : null}
+              <p style={{ margin: '4px 0', fontSize: '10px', color: '#999' }}>{printVariant.sku}</p>
             </div>
             <div className="flex gap-3">
               <button onClick={printQR}

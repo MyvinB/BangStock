@@ -59,7 +59,14 @@ async function sendToPrinter(data: Uint8Array) {
   await device.close()
 }
 
-function renderLabel(qrDataUrl: string, name: string, sku: string): Promise<HTMLCanvasElement> {
+function renderLabel(
+  qrDataUrl: string,
+  productName: string,
+  sku: string,
+  color?: string,
+  size?: string,
+  price?: number
+): Promise<HTMLCanvasElement> {
   return new Promise((resolve) => {
     const canvas = document.createElement('canvas')
     canvas.width = PRINT_WIDTH_DOTS
@@ -79,11 +86,28 @@ function renderLabel(qrDataUrl: string, name: string, sku: string): Promise<HTML
       const textX = qrSize + 8
       const maxTextWidth = canvas.width - textX - 2
 
-      ctx.font = `bold ${Math.floor(PRINT_HEIGHT_DOTS * 0.18)}px sans-serif`
-      wrapText(ctx, name, textX, Math.floor(PRINT_HEIGHT_DOTS * 0.35), maxTextWidth, Math.floor(PRINT_HEIGHT_DOTS * 0.2))
+      // Shorten product name to max 22 characters
+      const truncatedName = productName.length > 22 ? productName.slice(0, 22) + '..' : productName;
 
-      ctx.font = `${Math.floor(PRINT_HEIGHT_DOTS * 0.14)}px sans-serif`
-      ctx.fillText(sku, textX, Math.floor(PRINT_HEIGHT_DOTS * 0.75), maxTextWidth)
+      // 1. Draw Product Name (Line 1, Bold)
+      ctx.font = `bold ${Math.floor(PRINT_HEIGHT_DOTS * 0.16)}px sans-serif`
+      ctx.fillText(truncatedName, textX, Math.floor(PRINT_HEIGHT_DOTS * 0.22), maxTextWidth)
+
+      // 2. Draw Color and Size (Line 2, Regular/Muted)
+      const variantText = [color, size].filter(Boolean).join(' / ')
+      ctx.font = `${Math.floor(PRINT_HEIGHT_DOTS * 0.13)}px sans-serif`
+      ctx.fillText(variantText, textX, Math.floor(PRINT_HEIGHT_DOTS * 0.44), maxTextWidth)
+
+      // 3. Draw Price (Line 3, Bold)
+      if (price !== undefined) {
+        ctx.font = `bold ${Math.floor(PRINT_HEIGHT_DOTS * 0.18)}px sans-serif`
+        ctx.fillText(`₹${price}`, textX, Math.floor(PRINT_HEIGHT_DOTS * 0.68), maxTextWidth)
+      }
+
+      // 4. Draw SKU (Line 4, Smaller Regular)
+      ctx.font = `${Math.floor(PRINT_HEIGHT_DOTS * 0.12)}px sans-serif`
+      const skuY = price !== undefined ? Math.floor(PRINT_HEIGHT_DOTS * 0.88) : Math.floor(PRINT_HEIGHT_DOTS * 0.75)
+      ctx.fillText(sku, textX, skuY, maxTextWidth)
 
       resolve(canvas)
     }
@@ -112,10 +136,17 @@ async function generateQRDataUrl(text: string, size: number): Promise<string> {
   return QRCode.toDataURL(text, { width: size, margin: 1 })
 }
 
-export async function printLabel(name: string, sku: string, copies: number = 1) {
+export async function printLabel(
+  productName: string,
+  sku: string,
+  copies: number = 1,
+  color?: string,
+  size?: string,
+  price?: number
+) {
   const qrSize = PRINT_HEIGHT_DOTS - 4
   const qrDataUrl = await generateQRDataUrl(sku, qrSize)
-  const canvas = await renderLabel(qrDataUrl, name, sku)
+  const canvas = await renderLabel(qrDataUrl, productName, sku, color, size, price)
 
   const ctx = canvas.getContext('2d')!
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)

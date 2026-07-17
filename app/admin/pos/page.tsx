@@ -14,7 +14,7 @@ export default function POSPage() {
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('Cash')
-  const [discount, setDiscount] = useState('')
+  const [customTotal, setCustomTotal] = useState('')
 
   async function onPhoneChange(phone: string) {
     setCustomerPhone(phone)
@@ -68,9 +68,10 @@ export default function POSPage() {
   }
 
   const subtotal = cart.reduce((sum, item) => sum + (item.product.selling_price * item.quantity), 0)
-  const discountPct = parseFloat(discount) || 0
-  const discountAmt = subtotal * (discountPct / 100)
-  const total = subtotal - discountAmt
+  const enteredTotal = customTotal !== '' ? parseFloat(customTotal) : subtotal
+  const total = customTotal !== '' ? Math.max(0, Math.min(enteredTotal, subtotal)) : subtotal
+  const discountAmt = subtotal - total
+  const discountPct = subtotal > 0 ? (discountAmt / subtotal) * 100 : 0
 
   async function startScan() {
     processedRef.current = false
@@ -147,7 +148,7 @@ export default function POSPage() {
       setCart([])
       setCustomerName('')
       setCustomerPhone('')
-      setDiscount('')
+      setCustomTotal('')
       fetchProducts()
     }
   }
@@ -274,10 +275,15 @@ export default function POSPage() {
                   </div>
                   <div className="text-right text-sm text-gray-500">Subtotal: ₹{subtotal.toFixed(2)}</div>
                   <div className="flex items-center gap-2">
-                    <input type="number" placeholder="Discount %" min="0" max="100" value={discount}
-                      onChange={(e) => setDiscount(e.target.value)}
+                    <input type="number" placeholder="Custom Total / Sale Amount (₹)" min="0" max={subtotal} value={customTotal}
+                      onChange={(e) => setCustomTotal(e.target.value)}
                       className="flex-1 border-2 border-gray-300 rounded-lg px-4 py-3" />
-                    {discountPct > 0 && <span className="text-sm text-red-500 font-medium">-₹{discountAmt.toFixed(2)}</span>}
+                    {discountAmt > 0 && (
+                      <span className="text-sm text-red-500 font-medium flex flex-col items-end whitespace-nowrap">
+                        <span className="text-xs text-gray-500">({discountPct.toFixed(1)}% off)</span>
+                        <span>-₹{discountAmt.toFixed(2)}</span>
+                      </span>
+                    )}
                   </div>
                   <div className="text-2xl font-bold text-center py-4">Total: ₹{total.toFixed(2)}</div>
                   <button onClick={completeSale}
