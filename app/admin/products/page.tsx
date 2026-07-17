@@ -7,6 +7,8 @@ import { printLabel, connectPrinter, isWebUSBSupported } from '@/lib/thermal-pri
 import { SIZES, COLORS } from '@/lib/constants'
 import type { Product, Variant, ProductImage } from '@/types'
 
+type LocalVariant = Variant & { isCustomColor?: boolean }
+
 function generateVariantSku(base: string, color: string, size: string) {
   return `${base}-${color.substring(0, 3).toUpperCase()}-${size}`.replace(/\s/g, '')
 }
@@ -50,7 +52,7 @@ export default function ProductsPage() {
     const { data: existing } = await supabase.from('products').select('id').eq('sku', sku).maybeSingle()
     return existing ? `${prefix}-${Date.now().toString().slice(-4)}` : sku
   }
-  const [variants, setVariants] = useState<Variant[]>([{ size: 'M', color: 'Black', stock_quantity: 0, sku: '' }])
+  const [variants, setVariants] = useState<LocalVariant[]>([{ size: 'M', color: 'Black', stock_quantity: 0, sku: '' }])
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const [existingImages, setExistingImages] = useState<ProductImage[]>([])
@@ -83,12 +85,12 @@ export default function ProductsPage() {
     return supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl
   }
 
-  function updateVariant(index: number, field: keyof Variant, value: string | number) {
+  function updateVariant(index: number, field: keyof LocalVariant, value: any) {
     setVariants(prev => {
       const updated = [...prev]
       updated[index] = { ...updated[index], [field]: value }
       if (field === 'size' || field === 'color') {
-        updated[index].sku = generateVariantSku(formData.name || 'PRD', updated[index].color, updated[index].size)
+        updated[index].sku = generateVariantSku(formData.name || 'PRD', updated[index].color || '', updated[index].size || '')
       }
       return updated
     })
@@ -171,7 +173,7 @@ export default function ProductsPage() {
       stock_type: product.stock_type || 'regular',
     })
     setVariants(product.product_variants?.length > 0
-      ? product.product_variants.map(({ id, ...v }) => ({ ...v }))
+      ? product.product_variants.map(({ id, ...v }) => ({ ...v, isCustomColor: false }))
       : [{ size: 'M', color: 'Black', stock_quantity: 0, sku: '' }])
     setImageFiles([])
     setImagePreviews([])
@@ -426,6 +428,11 @@ export default function ProductsPage() {
     ...products.flatMap(p => p.product_variants || []).map(v => v.color).filter(Boolean)
   ])).sort()
 
+  const customSizes = Array.from(new Set(
+    products.flatMap(p => p.product_variants || []).map(v => v.size).filter(Boolean)
+  )).filter(s => !SIZES.includes(s as any))
+  const dynamicSizes = [...SIZES, ...customSizes]
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-indigo-600 text-white sticky top-0 z-10">
@@ -559,17 +566,35 @@ export default function ProductsPage() {
                 {variants.map((v, i) => (
                   <div key={i} className="grid grid-cols-4 gap-2 items-center">
                     <select value={v.size} onChange={(e) => updateVariant(i, 'size', e.target.value)}
-                      className="border-2 border-gray-300 rounded-lg px-3 py-2 text-sm">
-                      {SIZES.map(s => <option key={s}>{s}</option>)}
+                      className="w-full border-2 border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                      {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
-                     <div>
-                       <input type="text" placeholder="Color *" list={`colors-${i}`} value={v.color}
-                         onChange={(e) => updateVariant(i, 'color', e.target.value)}
-                         className="w-full border-2 border-gray-300 rounded-lg px-3 py-2 text-sm" />
-                       <datalist id={`colors-${i}`}>
-                         {dynamicColors.map(c => <option key={c} value={c} />)}
-                       </datalist>
-                     </div>
+                     {v.isCustomColor ? (
+                       <div className="relative flex items-center">
+                         <input type="text" placeholder="Color *" value={v.color}
+                           onChange={(e) => updateVariant(i, 'color', e.target.value)}
+                           className="w-full border-2 border-gray-300 rounded-lg pl-3 pr-8 py-2 text-sm bg-white" />
+                         <button type="button" onClick={() => {
+                           updateVariant(i, 'isCustomColor', false);
+                           updateVariant(i, 'color', 'Black');
+                         }}
+                           className="absolute right-2 text-gray-400 hover:text-red-500 text-sm">✕</button>
+                       </div>
+                     ) : (
+                       <select value={v.color}
+                         onChange={(e) => {
+                           if (e.target.value === 'ADD_CUSTOM') {
+                             updateVariant(i, 'isCustomColor', true);
+                             updateVariant(i, 'color', '');
+                           } else {
+                             updateVariant(i, 'color', e.target.value);
+                           }
+                         }}
+                         className="w-full border-2 border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                         {dynamicColors.map(c => <option key={c} value={c}>{c}</option>)}
+                         <option value="ADD_CUSTOM" className="text-indigo-600 font-semibold">+ Custom Color...</option>
+                       </select>
+                     )}
                     <input type="number" placeholder="Stock" min="0" value={v.stock_quantity === 0 ? '' : v.stock_quantity}
                       onChange={(e) => updateVariant(i, 'stock_quantity', e.target.value === '' ? 0 : parseInt(e.target.value))}
                       className="border-2 border-gray-300 rounded-lg px-3 py-2 text-sm" />
